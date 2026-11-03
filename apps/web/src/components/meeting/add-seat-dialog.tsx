@@ -5,7 +5,10 @@ import {
   prettyModelName,
   type ReasoningEffort,
   type Source,
+  seatNameClash,
+  seatNameClashMessage,
   sourceFamily,
+  uniqueSeatName,
 } from "@homestorm/shared";
 import { Loader2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -64,6 +67,7 @@ export function AddSeatDialog() {
   }, [open]);
 
   const inMeeting = new Set(state.seats.filter((s) => !s.removedAt).map((s) => s.model));
+  const clash = name.trim() ? seatNameClash(name, state.seats) : undefined;
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const models = (data?.models ?? [])
@@ -86,7 +90,7 @@ export function AddSeatDialog() {
   }
 
   async function add() {
-    if (!picked) return;
+    if (!picked || clash) return;
     setBusy(true);
     const ok = await act(() =>
       api.addSeat(id, {
@@ -163,7 +167,12 @@ export function AddSeatDialog() {
                             disabled={!m.available}
                             onClick={() => {
                               setPicked(m);
-                              setName(prettyModelName(m.id));
+                              setName(
+                                uniqueSeatName(
+                                  prettyModelName(m.id),
+                                  state.seats.map((s) => s.displayName),
+                                ),
+                              );
                             }}
                             className={cn(
                               "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:cursor-not-allowed disabled:hover:bg-transparent",
@@ -219,8 +228,15 @@ export function AddSeatDialog() {
                 id="seat-name"
                 value={name}
                 maxLength={60}
+                aria-invalid={!!clash}
+                aria-describedby={clash ? "seat-name-error" : undefined}
                 onChange={(e) => setName(e.target.value)}
               />
+              {clash && (
+                <p id="seat-name-error" className="text-xs text-destructive">
+                  {seatNameClashMessage(clash)}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="seat-persona">
@@ -255,7 +271,7 @@ export function AddSeatDialog() {
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={add} disabled={!picked || busy}>
+          <Button onClick={add} disabled={!picked || busy || !!clash}>
             {busy && <Loader2 className="animate-spin" />}
             Add seat
           </Button>

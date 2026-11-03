@@ -1,6 +1,6 @@
 // Display names for models and sources. A seat's default name comes from its model ID.
 
-import type { Source } from "./domain.js";
+import type { Seat, Source } from "./domain.js";
 
 const BRANDS: Record<string, string> = {
   claude: "Claude",
@@ -51,6 +51,39 @@ function titleWord(word: string): string {
   // v4 → V4; a plain word → Capitalized.
   if (/^v\d/i.test(word)) return word.toUpperCase();
   return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+// ── Seat names ──────────────────────────────────────────────────────────
+// Every view tags messages with the author's display name, so two seats with one name would read as one participant:
+// each would see its twin's answers under its own name. Names are unique within a meeting, ignoring case and
+// counting removed seats, because a removed seat's earlier messages keep its name.
+
+function nameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** `base` if it's free, else "base (2)", "base (3)", …: "Claude Opus 5.5 (2)" for a second seat on one model. */
+export function uniqueSeatName(base: string, taken: Iterable<string>): string {
+  const keys = new Set(Array.from(taken, nameKey));
+  if (!keys.has(nameKey(base))) return base;
+  for (let n = 2; ; n++) if (!keys.has(nameKey(`${base} (${n})`))) return `${base} (${n})`;
+}
+
+/** The seat that already has this name, if any. `selfId` is the seat being renamed, which may keep its name. */
+export function seatNameClash(
+  name: string,
+  seats: Pick<Seat, "id" | "displayName" | "removedAt">[],
+  selfId?: string,
+): Pick<Seat, "id" | "displayName" | "removedAt"> | undefined {
+  const key = nameKey(name);
+  return seats.find((s) => s.id !== selfId && nameKey(s.displayName) === key);
+}
+
+/** Why a name can't be used, in words for the Chair. */
+export function seatNameClashMessage(clash: Pick<Seat, "displayName" | "removedAt">): string {
+  return clash.removedAt
+    ? `A seat you removed was called "${clash.displayName}", and its messages keep that name. Pick another name.`
+    : `Another seat is already called "${clash.displayName}". Pick another name.`;
 }
 
 /** The source tag on a seat ("Claude · subscription"). */

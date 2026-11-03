@@ -4,6 +4,17 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-03
+
+- **Fix: two seats could share a name.** Several seats on one model are fine (each is its own participant with its
+  own view, persona and effort), but the Add seat dialog pre-filled the plain model name, which skipped the API's
+  "(2)" suffix. Both twins were then called "Claude Opus 5.5": each saw the other's answers under its own name, and
+  its participant list marked both as "(you)".
+  - Seat names are now unique within a meeting, ignoring case and counting removed seats (their messages keep their
+    names). The dialog suggests the next free name; adding or renaming to a taken name is refused (409), with the
+    reason shown under the name field.
+  - Covered by unit tests (`uniqueSeatName`, `seatNameClash`) and an integration test; checked in the browser.
+
 ## 2026-11-02
 
 - **M8 done: homestorm is live** at http://homestorm.arch.internal (API http://homestorm-api.arch.internal).

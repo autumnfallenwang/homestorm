@@ -1,6 +1,11 @@
 "use client";
 
-import type { ReasoningEffort, Seat } from "@homestorm/shared";
+import {
+  type ReasoningEffort,
+  type Seat,
+  seatNameClash,
+  seatNameClashMessage,
+} from "@homestorm/shared";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +32,7 @@ import { useRoom } from "./room-context";
 
 /** Edit name, persona and thinking effort. The model can't change: that would be a different seat. */
 export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: () => void }) {
-  const { id, act } = useRoom();
+  const { id, state, act } = useRoom();
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
@@ -41,8 +46,10 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
     }
   }, [seat]);
 
+  const clash = seat && name.trim() ? seatNameClash(name, state.seats, seat.id) : undefined;
+
   async function save() {
-    if (!seat || !name.trim()) return;
+    if (!seat || !name.trim() || clash) return;
     setBusy(true);
     const ok = await act(() =>
       api.updateSeat(id, seat.id, {
@@ -69,8 +76,15 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
               id="edit-name"
               value={name}
               maxLength={60}
+              aria-invalid={!!clash}
+              aria-describedby={clash ? "edit-name-error" : undefined}
               onChange={(e) => setName(e.target.value)}
             />
+            {clash && (
+              <p id="edit-name-error" className="text-xs text-destructive">
+                {seatNameClashMessage(clash)}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-persona">
@@ -102,7 +116,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={busy || !name.trim()}>
+          <Button onClick={save} disabled={busy || !name.trim() || !!clash}>
             {busy && <Loader2 className="animate-spin" />}
             Save
           </Button>

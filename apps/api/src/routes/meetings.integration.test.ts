@@ -185,6 +185,53 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(lines).toContain("You removed Claude Opus 5.5 from the meeting");
   });
 
+  it("keeps seat names unique: two seats on one model get different names", async () => {
+    const { call } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "T" })).body.id as string;
+    const seats = `/api/meetings/${id}/seats`;
+    const a = (await call("POST", seats, { model: "claude-opus-5-5" })).body as Seat;
+    const b = (await call("POST", seats, { model: "claude-opus-5-5" })).body as Seat;
+    expect([a.displayName, b.displayName]).toEqual(["Claude Opus 5.5", "Claude Opus 5.5 (2)"]);
+
+    // A name another seat has is refused, whatever its case, when adding or renaming.
+    const taken = await call("POST", seats, {
+      model: "claude-opus-5-5",
+      displayName: "claude opus 5.5",
+    });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error).toBe(
+      'Another seat is already called "Claude Opus 5.5". Pick another name.',
+    );
+    expect(
+      (await call("PATCH", `${seats}/${b.id}`, { displayName: "Claude Opus 5.5" })).status,
+    ).toBe(409);
+
+    // A seat may keep its own name (or change its case), and a free name is fine.
+    expect(
+      (await call("PATCH", `${seats}/${a.id}`, { displayName: "Claude opus 5.5" })).status,
+    ).toBe(200);
+    const skeptic = await call("PATCH", `${seats}/${b.id}`, { displayName: "The Skeptic" });
+    expect(skeptic.body.displayName).toBe("The Skeptic");
+
+    // A removed seat's messages keep its name, so the name stays taken.
+    expect((await call("DELETE", `${seats}/${a.id}`)).status).toBe(204);
+    const again = (await call("POST", seats, { model: "claude-opus-5-5" })).body as Seat;
+    expect(again.displayName).toBe("Claude Opus 5.5 (2)");
+    const reuse = await call("POST", seats, {
+      model: "gpt-6-luna",
+      displayName: "Claude opus 5.5",
+    });
+    expect(reuse.status).toBe(409);
+    expect(reuse.body.error).toMatch(/^A seat you removed was called "Claude opus 5.5"/);
+
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.seats.map((s) => s.displayName)).toEqual([
+      "Claude opus 5.5",
+      "The Skeptic",
+      "Claude Opus 5.5 (2)",
+    ]);
+  });
+
   it("live stream: snapshot first, then deltas and the finished answer", async () => {
     const { app, call, llm } = setup();
     llm.on("claude-opus-5-5", { chunks: ["Hello ", "chair"], delayMs: 20 });

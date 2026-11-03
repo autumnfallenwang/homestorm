@@ -226,6 +226,16 @@ export function createStore(db: Database) {
       return row ? toSeat(row) : null;
     },
 
+    /** Every seat the meeting ever had, removed ones included (seat names stay unique across them). */
+    async allSeats(meetingId: string): Promise<Seat[]> {
+      const rows = await db
+        .select()
+        .from(seats)
+        .where(eq(seats.meetingId, meetingId))
+        .orderBy(asc(seats.position));
+      return rows.map(toSeat);
+    },
+
     async activeSeats(meetingId: string): Promise<Seat[]> {
       const rows = await db
         .select()

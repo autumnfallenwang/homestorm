@@ -10,6 +10,7 @@
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
 //   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort? }
 //   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort
+//                                                      (a name another seat has, or had, is 409)
 //   POST   /api/meetings/:id/seats/:seatId/move        { direction: up | down }
 //   DELETE /api/meetings/:id/seats/:seatId             remove from the meeting
 //   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo } (ADR 0006)
@@ -27,8 +28,11 @@ import {
   SendActionInput,
   type Source,
   StopInput,
+  seatNameClash,
+  seatNameClashMessage,
   UpdateMeetingInput,
   UpdateSeatInput,
+  uniqueSeatName,
   WrapUpInput,
 } from "@homestorm/shared";
 import { type Context, Hono } from "hono";
@@ -200,11 +204,19 @@ export function meetingRoutes(deps: MeetingDeps) {
     if (!model) return c.json({ error: `llmgw has no model "${input.model}".` }, 400);
     if (!model.available)
       return c.json({ error: `${input.model} isn't on the current plan.` }, 400);
+    const existing = await store.allSeats(id);
+    const clash = input.displayName && seatNameClash(input.displayName, existing);
+    if (clash) return c.json({ error: seatNameClashMessage(clash) }, 409);
     const seat = await store.addSeat({
       meetingId: id,
       model: model.id,
       ownedBy: model.ownedBy,
-      displayName: input.displayName ?? (await uniqueName(id, prettyModelName(model.id))),
+      displayName:
+        input.displayName ??
+        uniqueSeatName(
+          prettyModelName(model.id),
+          existing.map((s) => s.displayName),
+        ),
       persona: input.persona?.trim() || null,
       reasoningEffort: input.reasoningEffort ?? "low",
     });
@@ -213,19 +225,16 @@ export function meetingRoutes(deps: MeetingDeps) {
     return c.json(seat, 201);
   });
 
-  /** "Claude Opus 5.5", then "Claude Opus 5.5 (2)" for a second seat on the same model. */
-  async function uniqueName(meetingId: string, base: string): Promise<string> {
-    const taken = new Set((await store.activeSeats(meetingId)).map((s) => s.displayName));
-    if (!taken.has(base)) return base;
-    for (let n = 2; ; n++) if (!taken.has(`${base} (${n})`)) return `${base} (${n})`;
-  }
-
   app.patch("/meetings/:id/seats/:seatId", async (c) => {
     const id = c.req.param("id");
     const input = await parse(c, UpdateSeatInput);
     if (input instanceof Response) return input;
     const before = await store.getSeat(id, c.req.param("seatId"));
     if (!before || before.removedAt) return c.json({ error: "Not found" }, 404);
+    if (input.displayName) {
+      const clash = seatNameClash(input.displayName, await store.allSeats(id), before.id);
+      if (clash) return c.json({ error: seatNameClashMessage(clash) }, 409);
+    }
     const seat = await store.updateSeat(before.id, input);
     engine.emit(id, { type: "seat", seat });
     if (input.muted !== undefined && input.muted !== before.muted) {

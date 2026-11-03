@@ -17,6 +17,9 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 
 - **Removed seats are kept** (`removed_at`), so their earlier messages still have a name in every view. They leave
   the roster and are never called again.
+- **Seat names are unique within a meeting,** ignoring case and counting removed seats, because every view tags
+  messages by name. Several seats may use the same model: the default names are "Claude Opus 5.5", then
+  "Claude Opus 5.5 (2)". The API refuses a taken name with 409 (`seatNameClash` in `packages/shared/src/names.ts`).
 - **Event lines** ("You muted Claude Sonnet 5.5 for rounds") are messages with `author_kind = 'event'`. Seats never
   see them.
 - **Tracing fields** on seat messages: `model`, `owned_by`, `reasoning_effort`, `usage` (with an `estimated` flag),

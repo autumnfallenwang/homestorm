@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { canTakeFloor, SendActionInput } from "./domain.js";
-import { ordinal, prettyModelName, sourceLabel } from "./names.js";
+import {
+  ordinal,
+  prettyModelName,
+  seatNameClash,
+  seatNameClashMessage,
+  sourceLabel,
+  uniqueSeatName,
+} from "./names.js";
 
 describe("prettyModelName", () => {
   it.each([
@@ -82,5 +89,40 @@ describe("SendActionInput", () => {
   it("accepts a reply-to with no note", () => {
     const r = SendActionInput.safeParse({ mode: "in_turn", targets: [seat], replyTo: seat });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("seat names", () => {
+  const seats = [
+    { id: "a", displayName: "Claude Opus 5.5", removedAt: null },
+    { id: "b", displayName: "Claude Opus 5.5 (2)", removedAt: null },
+    { id: "c", displayName: "GPT-6 Luna", removedAt: "2026-11-03T12:00:00.000Z" },
+  ];
+  const names = seats.map((s) => s.displayName);
+
+  it("numbers a second seat on the same model, skipping taken numbers", () => {
+    expect(uniqueSeatName("DeepSeek Flash", names)).toBe("DeepSeek Flash");
+    expect(uniqueSeatName("Claude Opus 5.5", names)).toBe("Claude Opus 5.5 (3)");
+    expect(uniqueSeatName("claude opus 5.5", names)).toBe("claude opus 5.5 (3)");
+  });
+
+  it("counts removed seats, since their messages keep their names", () => {
+    expect(uniqueSeatName("GPT-6 Luna", names)).toBe("GPT-6 Luna (2)");
+    expect(seatNameClash("GPT-6 Luna", seats)?.id).toBe("c");
+  });
+
+  it("finds a clash ignoring case and spaces, but lets a seat keep its own name", () => {
+    expect(seatNameClash("  claude OPUS 5.5 ", seats)?.id).toBe("a");
+    expect(seatNameClash("Claude Opus 5.5", seats, "a")).toBeUndefined();
+    expect(seatNameClash("claude opus 5.5", seats, "a")).toBeUndefined();
+    expect(seatNameClash("Claude Opus 5.5", seats, "b")?.id).toBe("a");
+    expect(seatNameClash("The Skeptic", seats)).toBeUndefined();
+  });
+
+  it("says why a name is taken", () => {
+    expect(seatNameClashMessage(seats[0] as (typeof seats)[number])).toBe(
+      'Another seat is already called "Claude Opus 5.5". Pick another name.',
+    );
+    expect(seatNameClashMessage(seats[2] as (typeof seats)[number])).toMatch(/A seat you removed/);
   });
 });
