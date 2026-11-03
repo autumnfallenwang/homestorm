@@ -78,13 +78,14 @@ cluster.
 
 - [x] D1–D5 decided and recorded as ADRs 0009–0013; D6 closed as outside homestorm
 
-### M3: Data model and per-seat view ⬜
+### M3: Data model and per-seat view ✅
 
-- [ ] Schema: meeting, seat, message, round, including start and finish times and usage fields
-- [ ] `buildView(meeting, seat)`: role mapping, speaker tags, merged turns, intro, visibility rule, trimming for long
+- [x] Schema: meeting, seat, message, round, including start and finish times and usage fields
+  ([data-model.md](data-model.md); first migration `0000_init.sql`)
+- [x] `buildView(meeting, seat)`: role mapping, speaker tags, merged turns, intro, visibility rule, trimming for long
   meetings
-- [ ] Intro and floor-note templates (D5)
-- [ ] Unit tests for the view builder
+- [x] Intro and floor-note templates (D5): `apps/api/src/engine/prompts.ts`
+- [x] Unit tests for the view builder
 
 ### M4: Project scaffold ⬜
 

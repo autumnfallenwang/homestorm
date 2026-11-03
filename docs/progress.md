@@ -6,6 +6,15 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M3 done: data model and per-seat view.**
+  - Workspace skeleton: pnpm + Turborepo, `packages/shared` (domain types, the action schema, display names) and
+    `apps/api`.
+  - Drizzle schema and first migration: meetings, seats, rounds, messages, plus Better Auth's tables.
+  - The visibility rule is stored as a per-meeting **logical clock**: `visible_seq` when a message enters the record,
+    `cutoff_seq` when a turn starts. Views are ordered by `visible_seq`, so they only ever grow at the end
+    ([data-model.md](data-model.md)).
+  - `buildView`, the intro and floor-note templates, and trimming, with 21 unit tests (45 across the workspace).
+  - Local Postgres runs on `127.0.0.1:5433` (`scripts/db-start.sh`).
 - **M2 done: decisions recorded.**
   - D1 v1 scope: [ADR 0009](adr/0009-first-version-scope.md).
   - D2 server-run rounds, one SSE stream per meeting: [ADR 0010](adr/0010-rounds-run-on-the-server.md).

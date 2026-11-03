@@ -27,6 +27,7 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
 | [docs/adr/](docs/adr/) | Architecture decision records, one decision each |
 | [docs/chat-wrapper-research.md](docs/chat-wrapper-research.md) | The llmgw backend, existing chat apps compared, wrapper features, how each seat's view is built |
 | [docs/meeting-control-design.md](docs/meeting-control-design.md) | The chair, the ruleset, real code versus natural language, UI controls |
+| [docs/data-model.md](docs/data-model.md) | Tables, message statuses, and the logical clock behind the visibility rule |
 
 **UI mockup:** approved, and described in [meeting-control-design.md](docs/meeting-control-design.md) §5. The mockup
 itself is kept outside the repo.
