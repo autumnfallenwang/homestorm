@@ -318,6 +318,26 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     const m = (await seatMessages(w.meeting.id))[0]!;
     expect(m.status).toBe("error");
     expect(m.error?.code).toBe("empty_answer");
+    expect(m.error?.message).toContain("output limit (10,240 tokens)");
+  });
+
+  it("gives thinking room on top of the answer cap, within the model's limit", async () => {
+    const w = await world();
+    await store.updateSeat(w.claude.id, { reasoningEffort: "high" });
+    w.llm.models = w.llm.models.map((m) =>
+      m.id === "gpt-6-luna" ? { ...m, maxTokens: 4_096 } : m,
+    );
+    await w.engine.send(w.meeting.id, {
+      text: "Q",
+      mode: "blind",
+      targets: "everyone",
+      replyTo: null,
+    });
+    await w.engine.waitIdle(w.meeting.id);
+    // Concise: 2,048 for the answer, plus 8,192 thinking room at low effort or 32,768 at high.
+    expect(w.llm.callsFor("deepseek-v4-pro")[0]?.maxTokens).toBe(10_240);
+    expect(w.llm.callsFor("claude-opus-5-5")[0]?.maxTokens).toBe(34_816);
+    expect(w.llm.callsFor("gpt-6-luna")[0]?.maxTokens).toBe(4_096);
   });
 
   it("reply-to quotes the target in the floor note and refuses the author replying to itself", async () => {

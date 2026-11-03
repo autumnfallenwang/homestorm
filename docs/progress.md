@@ -6,6 +6,17 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-03
 
+- **Fix: DeepSeek V4 Pro returned an empty answer** in the live test's blind round ("empty_answer" after 46 s).
+  llmgw's usage line showed exactly 2,048 output tokens: the Concise cap. DeepSeek counts thinking inside
+  `max_tokens`, so it spent the whole cap thinking.
+  - **Checked where the fault was,** with the same view sent straight to DeepSeek and through llmgw: both work.
+    DeepSeek's thinking length varies a lot on the same question (35 to 1,116 tokens at `low`, up to 2,175 at
+    `high`). llmgw turns `low` into `high` for this model and doesn't forward the level (its model data lists only
+    `high` and `max`); that's noted for llmgw, not changed.
+  - **Fix in homestorm:** `max_tokens` is now the answer room plus thinking room by effort (low 8,192, medium 16,384,
+    high 32,768), within the model's own limit. Concise at low effort is 10,240
+    ([ADR 0012](adr/0012-long-meetings-answer-length-effort.md)). The "empty answer" problem now names the limit.
+  - Covered by unit tests (`maxOutputTokens`) and an engine test of what each seat is sent.
 - **Fix: two seats could share a name.** Several seats on one model are fine (each is its own participant with its
   own view, persona and effort), but the Add seat dialog pre-filled the plain model name, which skipped the API's
   "(2)" suffix. Both twins were then called "Claude Opus 5.5": each saw the other's answers under its own name, and

@@ -25,7 +25,7 @@ import { type LlmClient, toLlmError } from "../services/llmgw.js";
 import type { MessagePatch, Store } from "../services/store.js";
 import type { EventHub } from "./hub.js";
 import type { Floor, ReplyTarget } from "./prompts.js";
-import { displayTokens, OUTPUT_CAP, viewBudget } from "./tokens.js";
+import { displayTokens, maxOutputTokens, viewBudget } from "./tokens.js";
 import { buildView } from "./view.js";
 
 /** A refused action, mapped onto an HTTP status by the routes. */
@@ -523,7 +523,11 @@ export class Engine {
 
     const models = await this.llm.listModels().catch(() => []);
     const info = models.find((m) => m.id === seat.model);
-    const outputCap = OUTPUT_CAP[state.meeting.answerLength];
+    const outputCap = maxOutputTokens(
+      state.meeting.answerLength,
+      seat.reasoningEffort,
+      info?.maxTokens ?? null,
+    );
     const view = buildView({
       meeting: state.meeting,
       seats: state.seats,
@@ -622,7 +626,7 @@ export class Engine {
           finishedAt: new Date(),
           error: {
             code: "empty_answer",
-            message: "The model returned no text. It may have spent its output limit on thinking.",
+            message: `The model returned no text. It may have spent its output limit (${outputCap.toLocaleString("en-US")} tokens) on thinking.`,
           },
         };
       } else {

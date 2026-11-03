@@ -16,8 +16,27 @@ export const MESSAGE_OVERHEAD_TOKENS = 4;
 /** Room left for the reply and for estimation error. */
 export const BUDGET_MARGIN_TOKENS = 4_000;
 
-/** Output caps per answer length (ADR 0012). GPT models ignore max_tokens. */
-export const OUTPUT_CAP = { concise: 2_048, detailed: 8_192 } as const;
+/** Room for the visible answer, per answer length (ADR 0012). */
+export const ANSWER_CAP = { concise: 2_048, detailed: 8_192 } as const;
+
+/**
+ * Extra room for thinking, per thinking effort (ADR 0012). Reasoning models count thinking inside `max_tokens`, and
+ * how long they think varies a lot: DeepSeek V4 Pro spent over 2,048 tokens thinking on a short question.
+ */
+export const THINKING_ROOM = { low: 8_192, medium: 16_384, high: 32_768 } as const;
+
+/**
+ * `max_tokens` for one turn: the answer cap plus thinking room, never more than the model's own limit. It's a
+ * backstop against runaway answers; the intro's length rule keeps answers short. GPT models ignore it.
+ */
+export function maxOutputTokens(
+  answerLength: keyof typeof ANSWER_CAP,
+  effort: keyof typeof THINKING_ROOM,
+  modelMaxTokens: number | null,
+): number {
+  const cap = ANSWER_CAP[answerLength] + THINKING_ROOM[effort];
+  return modelMaxTokens ? Math.min(cap, modelMaxTokens) : cap;
+}
 
 /**
  * How many tokens one seat's view may use: the model's window minus the reply and a margin, and never more than
