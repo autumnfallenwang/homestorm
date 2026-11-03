@@ -6,6 +6,15 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M4 done: scaffold.**
+  - `apps/web`: Next.js 15, Tailwind 4, shadcn components, Geist fonts, the theme with source colors. Builds.
+  - API skeleton: config, pino logs in the house shape, Better Auth with one admin (sign-up closes after the first
+    account), `reset-password` script.
+  - llmgw client on the `openai` package with `maxRetries: 0`, so failures stay visible. The live smoke test
+    streamed from Claude Haiku 5.5, GPT-5.6 Luna and DeepSeek Flash, and got `model_not_found` for an unknown model.
+  - Found: DeepSeek Flash can spend a tiny output cap on reasoning and return no text. homestorm will show that as
+    an "empty answer" problem instead of a blank message.
+  - Integration tests use a separate `homestorm_test` database, created and migrated automatically.
 - **M3 done: data model and per-seat view.**
   - Workspace skeleton: pnpm + Turborepo, `packages/shared` (domain types, the action schema, display names) and
     `apps/api`.

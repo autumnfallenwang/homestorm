@@ -7,6 +7,7 @@ coverage/
 .env.*
 !.env.example
 *.log
+*.tsbuildinfo
 .DS_Store
 
 # Account-specific notes (plans, balances, private links): never commit

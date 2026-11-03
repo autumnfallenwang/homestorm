@@ -61,6 +61,7 @@ export const ERROR_CODES = [
   "model_not_found",
   "gateway_error",
   "interrupted",
+  "empty_answer",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

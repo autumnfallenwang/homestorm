@@ -6,7 +6,7 @@ who answers whom, and you can join the discussion yourself.
 
 It replaces copy-pasting the same question between the Claude, ChatGPT and Gemini web apps.
 
-**Status:** design done, no code yet. See [the plan](docs/plan.md) and [progress](docs/progress.md).
+**Status:** in development, running on localhost. See [the plan](docs/plan.md) and [progress](docs/progress.md).
 
 ## How it works, in short
 
@@ -17,6 +17,25 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
   the chair included, are `user` with a speaker tag.
 - **The chair runs it:** blind rounds (independent answers), in-turn rounds (discussion), @mentions, replies to a
   specific message, mute, stop and retry, wrap up into minutes.
+
+## Develop locally
+
+Needs Node 22+, pnpm 10 and Docker, plus llmgw reachable at `http://llmgw.arch.internal`.
+
+```sh
+pnpm install
+cp apps/api/.env.example apps/api/.env
+./scripts/db-start.sh                      # Postgres on 127.0.0.1:5433
+pnpm --filter @homestorm/api db:migrate
+pnpm dev                                   # web on http://localhost:3000, API on :3001
+```
+
+On first run, open the web app and create the admin login.
+
+- `pnpm test:fast`: unit tests, no database or llmgw needed.
+- `pnpm test`: adds integration tests against `homestorm_test` (created automatically; never the dev database).
+- `LLMGW_LIVE=1 pnpm --filter @homestorm/api test:live`: smoke test against the real llmgw (spends a few tokens).
+- `pnpm lint`, `pnpm typecheck`.
 
 ## Docs
 

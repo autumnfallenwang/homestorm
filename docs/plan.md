@@ -87,11 +87,12 @@ cluster.
 - [x] Intro and floor-note templates (D5): `apps/api/src/engine/prompts.ts`
 - [x] Unit tests for the view builder
 
-### M4: Project scaffold ⬜
+### M4: Project scaffold ✅
 
-- [ ] pnpm + Turborepo monorepo: `apps/api`, `apps/web`, `packages/shared`
-- [ ] Drizzle setup and first migration; Biome, Vitest, tsc
-- [ ] llmgw client (`openai` package) with a smoke test against the real gateway
+- [x] pnpm + Turborepo monorepo: `apps/api`, `apps/web`, `packages/shared`
+- [x] Drizzle setup and first migration; Biome, Vitest, tsc
+- [x] llmgw client (`openai` package) with a smoke test against the real gateway (all three sources)
+- [x] API skeleton: config, pino logging, request log, Better Auth admin login (D3), `reset-password` script
 
 ### M5: Meeting engine ⬜
 
