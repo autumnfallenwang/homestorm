@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDown, LogOut, Plus, Search } from "lucide-react";
+import { ChevronsUpDown, KeyRound, LogOut, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { signOut } from "@/lib/auth-client";
 import { dayGroup, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ChangePasswordDialog } from "./change-password-dialog";
 import { Logo } from "./logo";
 import { useMeetings } from "./meetings-context";
 import { NewMeetingDialog } from "./new-meeting-dialog";
@@ -31,6 +32,7 @@ export function MeetingsSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState("");
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,6 +137,10 @@ export function MeetingsSidebar({ onNavigate }: { onNavigate?: () => void }) {
               Signed in as {me.user.email}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+              <KeyRound />
+              Change password
+            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={async () => {
                 await signOut().catch(() => {});
@@ -146,6 +152,7 @@ export function MeetingsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
       </div>
     </aside>
   );

@@ -76,4 +76,31 @@ describe.skipIf(!hasTestDb)("login (integration)", () => {
     expect((await b("/api/auth/sign-out", { method: "POST", body: {} })).status).toBe(200);
     expect((await b("/api/me")).status).toBe(401);
   });
+
+  it("changes the password: the old one stops working, the new one signs in", async () => {
+    const app = createApp({ rateLimit: false });
+    const b = browser(app);
+    await b("/api/auth/sign-up/email", {
+      method: "POST",
+      body: { name: "Chair", email: "chair@example.com", password: "correct horse battery" },
+    });
+    const changed = await b("/api/auth/change-password", {
+      method: "POST",
+      body: {
+        currentPassword: "correct horse battery",
+        newPassword: "staple battery horse",
+        revokeOtherSessions: true,
+      },
+    });
+    expect(changed.status).toBe(200);
+    expect((await b("/api/me")).status).toBe(200);
+
+    const signIn = (password: string) =>
+      browser(app)("/api/auth/sign-in/email", {
+        method: "POST",
+        body: { email: "chair@example.com", password },
+      });
+    expect((await signIn("correct horse battery")).status).toBe(401);
+    expect((await signIn("staple battery horse")).status).toBe(200);
+  });
 });

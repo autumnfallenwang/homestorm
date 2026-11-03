@@ -6,6 +6,9 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M7 done: wrap up, export, login.** Wrap-up (minutes, decision, open questions; posted or kept from the seats) and
+  the Markdown export were built with M5/M6 and checked in the browser run. Login gained Change password, covered by
+  an integration test.
 - **M6 done: web UI.**
   - **Three panes, as in the mockup:**
     - meetings list (new, search, grouped by day, Live and Minutes badges, the chair's menu);

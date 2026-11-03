@@ -116,11 +116,13 @@ cluster.
 - [x] Driven in a real browser on localhost against the real llmgw (blind round, reply-to, @mention, stop and keep,
   mute, wrap-up, export, phone width)
 
-### M7: Wrap up, export, polish ⬜
+### M7: Wrap up, export, polish ✅
 
-- [ ] Wrap-up dialog and minutes posted to the meeting
-- [ ] Markdown export
-- [ ] Login (D3)
+- [x] Wrap-up dialog and minutes posted to the meeting (or kept from the seats)
+- [x] Markdown export
+- [x] Login (D3): first-run setup, sign in, sign out, change password, `reset-password` script
+- [x] Polish from the browser run: plain-text reply quotes, model order (strongest family, newest first), accessible
+  @mention list
 
 ### M8: Deploy ⬜
 
