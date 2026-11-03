@@ -1,0 +1,78 @@
+# Local full-stack bring-up — mirrors the in-cluster topology (api + web +
+# Postgres) for smoke-testing the production images before they ship. Not used
+# in k3s; the Helm chart owns the cluster deployment.
+
+services:
+  homestorm-db-prod:
+    image: postgres:17-alpine
+    container_name: homestorm-db-prod
+    restart: unless-stopped
+    ports:
+      - "52432:5432"
+    environment:
+      - POSTGRES_DB=homestorm
+      - POSTGRES_USER=homestorm
+      - POSTGRES_PASSWORD=homestorm
+    volumes:
+      - homestorm-db-prod-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homestorm -d homestorm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  homestorm-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    container_name: homestorm-api
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      homestorm-db-prod:
+        condition: service_healthy
+    environment:
+      - API_PORT=52001
+      - DATABASE_URL=postgresql://homestorm:homestorm@localhost:52432/homestorm
+      - CORS_ORIGINS=http://localhost:52000
+      # Local smoke-test values only. No COOKIE_DOMAIN: on localhost the
+      # session cookie stays host-only and still reaches both ports.
+      - BETTER_AUTH_SECRET=local-compose-only-not-a-real-secret-0123456789
+      - BETTER_AUTH_URL=http://localhost:52001
+      - LLMGW_URL=http://llmgw.arch.internal
+      - LOG_LEVEL=info
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  homestorm-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:52001
+    container_name: homestorm-web
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - homestorm-api
+    environment:
+      - PORT=52000
+      - HOSTNAME=0.0.0.0
+      - API_URL=http://localhost:52001
+      - LOG_LEVEL=info
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  homestorm-db-prod-data:

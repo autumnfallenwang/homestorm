@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "db") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "db") | nindent 4 }}
+spec:
+  # Headless: canonical pattern for stateful workloads. DNS for `homestorm-db`
+  # returns the pod IP directly, and the StatefulSet's `serviceName` uses this
+  # Service as its governing service.
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: {{ .Values.db.service.port }}
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    {{- include "homestorm.selectorLabels" (dict "context" . "component" "db") | nindent 4 }}

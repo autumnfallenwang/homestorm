@@ -1,0 +1,7 @@
+apiVersion: v2
+name: homestorm
+description: homestorm, a chair-run meeting room for several AI models — api + web + Postgres
+type: application
+version: 0.1.0
+# appVersion tracks the homestorm product, not any one component.
+appVersion: "0.1.0"

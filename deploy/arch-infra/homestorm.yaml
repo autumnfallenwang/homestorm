@@ -1,0 +1,45 @@
+# Argo CD Application CR for homestorm. This file is the source-of-truth COPY
+# that lives in THIS repo for review; the deployed copy is committed to the
+# arch-infra repo at apps/homestorm.yaml (arch-infra is what Argo CD watches).
+# Keep the two in sync — CI bumps the arch-infra copy's image tags on each
+# main build.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homestorm
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/autumnfallenwang/homestorm.git
+    targetRevision: main
+    path: deploy/chart
+    helm:
+      releaseName: homestorm
+      valueFiles:
+        - values.yaml
+      # The GHA workflow (bump-arch-infra job) rewrites BOTH api.image.tag and
+      # web.image.tag to the same commit SHA on every successful main build, so
+      # ArgoCD rolls api + web together. "latest" until the first build pushes
+      # SHA-tagged images — expect a brief ImagePullBackOff on the very first
+      # sync until the GHCR packages exist (and are made public).
+      parameters:
+        - name: api.image.tag
+          value: "latest"
+        - name: web.image.tag
+          value: "latest"
+        # homestorm-secrets is created before this Application is committed
+        # (scripts/create-cluster-secret.sh), so the migrate hook runs from the
+        # first sync, applying apps/api/drizzle/*.sql before the api starts.
+        - name: migrate.enabled
+          value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homestorm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

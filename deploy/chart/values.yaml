@@ -1,0 +1,170 @@
+# Default values for the homestorm chart.
+# Override via `helm install --set` or the ArgoCD Application's
+# spec.source.helm.parameters in arch-infra/apps/homestorm.yaml.
+#
+# Chart shape: three components (api, web, db) + a pre-install migrate Job, all
+# in one release. Helper templates take a (dict "context" . "component" "X")
+# argument so each workload gets its own labels + selectors.
+
+# Real secrets live in this Secret, created out-of-band before deploy:
+#   bash scripts/create-cluster-secret.sh   (reads ./cluster-secrets.env)
+# homestorm needs DATABASE_URL + POSTGRES_PASSWORD + BETTER_AUTH_SECRET. It holds no
+# provider keys: every model call goes through llmgw (ADR 0002).
+secrets:
+  name: homestorm-secrets
+
+api:
+  image:
+    repository: ghcr.io/autumnfallenwang/homestorm-api
+    # CI bumps `tag` to a commit SHA in the ArgoCD Application's parameters
+    # (api.image.tag). web bumps in the same commit (web.image.tag) so api +
+    # web roll together — the web build embeds NEXT_PUBLIC_API_URL at build
+    # time and the API contract evolves in lockstep.
+    tag: latest
+    pullPolicy: IfNotPresent
+  # The round runner and the live streams live in the one API process (ADR 0010);
+  # do not scale (see deployment-api.yaml Recreate strategy).
+  replicaCount: 1
+  service:
+    port: 80
+    targetPort: 52001
+  ingress:
+    enabled: true
+    className: traefik
+    host: homestorm-api.arch.internal
+  # Plaintext config. DATABASE_URL is wired via secretKeyRef in deployment-api.yaml.
+  env:
+    API_PORT: "52001"
+    CORS_ORIGINS: http://homestorm.arch.internal
+    # ★ Required for sign-in to work (ADR 0011). The UI is homestorm.arch.internal
+    # and the API homestorm-api.arch.internal — two hosts — so the session cookie
+    # must be set for the shared parent domain. Without it: sign-in returns 200,
+    # then every request 401s (homeparentcontrol hit exactly this). Same site,
+    # so SameSite=Lax still applies; plain HTTP on the LAN, as the siblings.
+    COOKIE_DOMAIN: .arch.internal
+    LOG_LEVEL: info
+    # Every model call goes through llmgw (ADR 0002), in-cluster: no ingress hop.
+    LLMGW_URL: http://llmgw.llmgw.svc.cluster.local
+    # Most tokens one seat's view may use per turn (ADR 0012).
+    VIEW_TOKEN_BUDGET: "120000"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  probes:
+    liveness:
+      httpGet:
+        path: /health
+        port: 52001
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    readiness:
+      httpGet:
+        path: /health
+        port: 52001
+      initialDelaySeconds: 3
+      periodSeconds: 10
+
+web:
+  image:
+    repository: ghcr.io/autumnfallenwang/homestorm-web
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port: 80
+    targetPort: 52000
+  ingress:
+    enabled: true
+    className: traefik
+    host: homestorm.arch.internal
+  env:
+    PORT: "52000"
+    HOSTNAME: "0.0.0.0"
+    # Runtime override for the web's server-side fetches — points at the
+    # in-cluster API Service DNS so SSR/route-handler calls never leave the pod
+    # network (browsers use the NEXT_PUBLIC_API_URL baked at build time).
+    API_URL: http://homestorm-api
+    LOG_LEVEL: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  probes:
+    liveness:
+      httpGet:
+        path: /
+        port: 52000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    readiness:
+      httpGet:
+        path: /
+        port: 52000
+      initialDelaySeconds: 3
+      periodSeconds: 10
+
+db:
+  # Plain postgres:17-alpine: homestorm uses no Postgres extensions.
+  image:
+    repository: postgres
+    tag: 17-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+    targetPort: 5432
+  persistence:
+    size: 5Gi
+    storageClass: local-path
+    mountPath: /var/lib/postgresql/data
+  env:
+    # initdb honors POSTGRES_DB + POSTGRES_USER only on an empty PGDATA.
+    POSTGRES_DB: homestorm
+    POSTGRES_USER: homestorm
+    # POSTGRES_PASSWORD comes from the homestorm-secrets Secret.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  # Postgres image runs as UID/GID 999. fsGroup 999 lets it write to the PVC.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+
+# Migrate Job — Helm pre-install/pre-upgrade hook running drizzle-kit migrate
+# against the SQL files baked into the api image (apps/api/drizzle/*.sql).
+# Disabled by default until homestorm-secrets exists; flip via the ArgoCD
+# parameter migrate.enabled=true once the secret + db are up.
+migrate:
+  enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Pod- and container-level security contexts. api + web run as node UID 1000;
+# the DB pod runs as postgres UID 999 and overrides podSecurityContext in its
+# template. allowPrivilegeEscalation / readOnlyRootFilesystem / capabilities
+# are container-level only — keep them in containerSecurityContext.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL

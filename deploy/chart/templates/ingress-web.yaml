@@ -1,0 +1,21 @@
+{{- if .Values.web.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "web") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "web") | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.web.ingress.className }}
+  rules:
+    - host: {{ .Values.web.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "homestorm.fullname" (dict "context" . "component" "web") }}
+                port:
+                  name: http
+{{- end }}

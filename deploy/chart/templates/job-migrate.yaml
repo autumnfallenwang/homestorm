@@ -1,0 +1,49 @@
+{{- if .Values.migrate.enabled -}}
+# Helm pre-install / pre-upgrade hook running drizzle-kit migrate against the
+# SQL files baked into the api image (apps/api/drizzle/*.sql). Disabled by
+# default — enable via the ArgoCD parameter migrate.enabled=true once
+# homestorm-secrets exists and the DB pod is up.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "migrate") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "migrate") | nindent 4 }}
+  annotations:
+    # Run before install + upgrade so the schema is ready by the time the API
+    # pod starts. hook-weight -5 sequences this before non-hook resources.
+    # Delete the previous Job before creating a new one so re-runs work cleanly;
+    # keep the Job after success for auditability.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "homestorm.selectorLabels" (dict "context" . "component" "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # drizzle-kit's own bin, under node — no pnpm wrapper printing banner
+          # lines or downloading pnpm at runtime (homework ADR 0003).
+          workingDir: /app/apps/api
+          command: ["node", "node_modules/drizzle-kit/bin.cjs", "migrate"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: DATABASE_URL
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+{{- end }}

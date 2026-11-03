@@ -1,0 +1,128 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Serialize back-to-back main pushes so an in-flight arch-infra bump isn't
+# cancelled mid-clone-push.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Unit tests don't connect to a DB, but apps/api/src/db/index.ts builds a
+    # postgres client at module load. It no longer throws when DATABASE_URL is
+    # unset (lazy connect), but supply a dummy anyway so any future eager check
+    # resolves and the import chain is unambiguous on CI (no .env here).
+    env:
+      DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # CI runs the fast (DB-free) suite. Integration tests need a live Postgres
+      # the runner doesn't ship; lint stays a local pre-merge gate.
+      - run: pnpm test:fast
+
+  build-and-deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.component }} image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile.${{ matrix.component }}
+          push: true
+          tags: |
+            ghcr.io/autumnfallenwang/homestorm-${{ matrix.component }}:latest
+            ghcr.io/autumnfallenwang/homestorm-${{ matrix.component }}:${{ github.sha }}
+          # Only the web image bakes a browser-side URL into the client bundle
+          # (Next.js inlines NEXT_PUBLIC_* at build time). The chart additionally
+          # sets API_URL at runtime (internal Service DNS) for server-side
+          # fetches. Auth goes to the API host (no NEXT_PUBLIC_AUTH_URL). The api
+          # image needs no build args.
+          build-args: |
+            ${{ matrix.component == 'web' && 'NEXT_PUBLIC_API_URL=http://homestorm-api.arch.internal' || '' }}
+          # Separate cache scopes — api and web have unrelated dep trees.
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+  bump-arch-infra:
+    needs: build-and-deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump api+web image tags in arch-infra
+        env:
+          GH_TOKEN: ${{ secrets.ARCH_INFRA_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::ARCH_INFRA_TOKEN not set. Skipping arch-infra bump."
+            exit 0
+          fi
+
+          # x-access-token URL so `git push` carries the PAT.
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/autumnfallenwang/arch-infra.git" /tmp/arch-infra
+          cd /tmp/arch-infra
+
+          if [ ! -f apps/homestorm.yaml ]; then
+            echo "::warning::apps/homestorm.yaml not present in arch-infra. Skipping bump."
+            exit 0
+          fi
+
+          # Single yq write bumps both api.image.tag and web.image.tag so ArgoCD
+          # rolls api + web together (same SHA; web bakes NEXT_PUBLIC_API_URL at
+          # build time, contract evolves in lockstep). yq v4 is preinstalled.
+          yq -i '
+            (.spec.source.helm.parameters[] | select(.name == "api.image.tag") | .value) = strenv(SHA) |
+            (.spec.source.helm.parameters[] | select(.name == "web.image.tag") | .value) = strenv(SHA)
+          ' apps/homestorm.yaml
+
+          git config user.email "actions@github.com"
+          git config user.name  "GitHub Actions"
+
+          if git diff --quiet apps/homestorm.yaml; then
+            echo "No change — arch-infra apps/homestorm.yaml already at $SHA."
+            exit 0
+          fi
+
+          git add apps/homestorm.yaml
+          git commit -m "homestorm: bump api+web images to $SHA"
+          git push
