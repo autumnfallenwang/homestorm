@@ -139,10 +139,12 @@ db:
     runAsGroup: 999
     fsGroup: 999
 
-# Migrate Job — Helm pre-install/pre-upgrade hook running drizzle-kit migrate
-# against the SQL files baked into the api image (apps/api/drizzle/*.sql).
-# Disabled by default until homestorm-secrets exists; flip via the ArgoCD
-# parameter migrate.enabled=true once the secret + db are up.
+# Migrate Job: OFF. The API applies apps/api/drizzle/*.sql itself at boot, waiting
+# for Postgres if it's still starting (apps/api/src/db/migrate.ts). The sibling
+# apps' Helm pre-install hook can't work on a first install: it runs before the
+# Postgres StatefulSet exists and waits forever (found on homestorm's first sync).
+# Kept for a manual re-run: migrate.enabled=true runs drizzle-kit migrate as a
+# pre-upgrade hook once the database exists.
 migrate:
   enabled: false
   resources:

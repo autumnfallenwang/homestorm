@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { closeDb, db } from "./db/index.js";
+import { migrateOnBoot } from "./db/migrate.js";
 import { Engine } from "./engine/engine.js";
 import { EventHub } from "./engine/hub.js";
 import { log } from "./lib/logger.js";
@@ -38,6 +39,7 @@ const engine = new Engine({ store, llm, hub, viewTokenBudget: config.viewTokenBu
 
 // Boot work runs before the port opens, so an unreachable DB is one `server.boot_failed` line and a restart.
 try {
+  await migrateOnBoot(db);
   // Nothing survives a restart (ADR 0010): answers left streaming become stopped, for the chair to keep or retry.
   const recovered = await store.recoverInterrupted();
   log.info({ event: "engine.recovered", ...recovered }, "interrupted turns recovered");

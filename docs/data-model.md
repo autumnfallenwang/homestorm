@@ -58,3 +58,14 @@ So:
 everything a seat saw before. So it lands at the end of that seat's next view, and the start of the view stays the
 same between turns, which lets prompt caching work. The transcript in the UI is still shown in creation order
 (`seq`).
+
+## Migrations
+
+- `apps/api/drizzle/` holds the SQL migrations, generated with
+  `pnpm exec drizzle-kit generate --name <name> < /dev/null`. Closing stdin keeps drizzle-kit's rename prompt from
+  looping (a homework lesson).
+- **The API applies them itself at boot**, before it opens its port, and waits for Postgres if it's still starting
+  (`apps/api/src/db/migrate.ts`). There's only ever one API process, so two migrations never race.
+- **Why not a Helm hook, like the sibling apps:** on homestorm's first install, the pre-install hook ran before the
+  Postgres StatefulSet existed and waited forever. The chart's migrate Job is kept but off.
+
