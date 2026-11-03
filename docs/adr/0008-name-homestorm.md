@@ -23,5 +23,6 @@ The name goes into the repo, images, Helm chart and hostname, so it had to be pi
 
 - **Names:** repo `autumnfallenwang/homestorm`; images `ghcr.io/autumnfallenwang/homestorm-*`; Helm chart and namespace
   `homestorm`.
-- **Hostname** (to confirm at deploy): `homestorm.arch.internal`.
+- **Hostnames** (in the home DNS since 2026-11-02, both pointing at Traefik on 192.168.1.163): `homestorm.arch.internal`
+  for the web app, `homestorm-api.arch.internal` for the API, the same two-host pattern as the sibling apps.
 - **Mockup:** its app title says "Homestorm".

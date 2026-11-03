@@ -37,6 +37,25 @@ On first run, open the web app and create the admin login.
 - `LLMGW_LIVE=1 pnpm --filter @homestorm/api test:live`: smoke test against the real llmgw (spends a few tokens).
 - `pnpm lint`, `pnpm typecheck`.
 
+## Deploy
+
+homestorm runs on the home k3s cluster like the sibling apps: GHCR images, the Helm chart in `deploy/chart`, and an
+Argo CD Application in `arch-infra` (`apps/homestorm.yaml`; review copy in `deploy/arch-infra/`).
+
+- **Web:** http://homestorm.arch.internal. **API:** http://homestorm-api.arch.internal (Traefik on 192.168.1.163).
+- **CI** (`.github/workflows/build.yml`): fast tests, then both images tagged with the commit SHA, then the image tags
+  bumped in arch-infra. The bump needs an `ARCH_INFRA_TOKEN` repo secret with write access to arch-infra; without it
+  the job skips with a warning and tags are bumped by hand.
+- **Secrets** (`homestorm-secrets`: `DATABASE_URL`, `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`) are created
+  out-of-band: `HOMESTORM_SECRET_ENV=private/cluster-secrets.env bash scripts/create-cluster-secret.sh`. The file is
+  gitignored; the template is `deploy/cluster-secrets.env.example`.
+- **First run:** open the web app and create the admin at once (ADR 0011).
+- **Forgotten password:**
+  `kubectl -n homestorm exec deploy/homestorm-api -- node --import tsx src/scripts/reset-password.ts <email>`.
+- **Logs:** `{namespace="homestorm"} | json`. One request and every seat turn it started:
+  `{namespace="homestorm"} | json | req_id="<id>"`.
+- **Local check of the production images:** `docker compose -f deploy/compose.yaml up --build` (web on :52000).
+
 ## Docs
 
 | Doc | What's in it |

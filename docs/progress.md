@@ -6,6 +6,14 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M8 in progress: deploy.**
+  - Dockerfiles, the Helm chart (api with Recreate, web, Postgres StatefulSet, migrate hook), CI and the Argo CD
+    Application, adapted from homework. The api reaches llmgw in-cluster at `llmgw.llmgw.svc.cluster.local`.
+  - The production images ran a real meeting locally: migrations through the hook's command, `node` as PID 1, JSON
+    logs from the first line.
+  - CI passed (tests, both images on GHCR with SHA tags); the images pull anonymously, so the cluster needs no
+    pull secret. The arch-infra bump was skipped: `ARCH_INFRA_TOKEN` isn't set on this repo yet.
+  - DNS: `homestorm.arch.internal` and `homestorm-api.arch.internal` point at Traefik (added by the user).
 - **M7 done: wrap up, export, login.** Wrap-up (minutes, decision, open questions; posted or kept from the seats) and
   the Markdown export were built with M5/M6 and checked in the browser run. Login gained Change password, covered by
   an integration test.

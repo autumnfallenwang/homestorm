@@ -18,7 +18,8 @@
       "!**/components/ui",
       "!**/settings.local.json",
       "!**/*.md",
-      "!**/private"
+      "!**/private",
+      "!**/deploy/chart/templates"
     ]
   },
   "css": {

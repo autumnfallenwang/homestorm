@@ -124,8 +124,9 @@ cluster.
 - [x] Polish from the browser run: plain-text reply quotes, model order (strongest family, newest first), accessible
   @mention list
 
-### M8: Deploy ⬜
+### M8: Deploy 🔄
 
-- [ ] Dockerfiles, Helm chart with its own Postgres, GHCR images
+- [x] Dockerfiles, Helm chart with its own Postgres, GHCR images (smoke-tested locally with a real meeting; CI green,
+  images publicly pullable)
 - [ ] `arch-infra` app entry, Argo CD sync, hostname
 - [ ] Logs in Loki; first real meeting on the cluster
