@@ -1,8 +1,13 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
-import { closeDb } from "./db/index.js";
+import { closeDb, db } from "./db/index.js";
+import { Engine } from "./engine/engine.js";
+import { EventHub } from "./engine/hub.js";
 import { log } from "./lib/logger.js";
+import { meetingRoutes } from "./routes/meetings.js";
+import { createLlmgwClient } from "./services/llmgw.js";
+import { createStore } from "./services/store.js";
 
 // ★ A crash is one JSON line at `fatal`, not a stack printed across dozens of Loki entries. Exit either way: state
 // after an uncaught error is unknown, and k8s restarts the pod.
@@ -26,7 +31,24 @@ if (!config.betterAuthSecret) {
   process.exit(1);
 }
 
-const app = createApp();
+const store = createStore(db);
+const hub = new EventHub();
+const llm = createLlmgwClient(config.llmgwUrl);
+const engine = new Engine({ store, llm, hub, viewTokenBudget: config.viewTokenBudget });
+
+// Boot work runs before the port opens, so an unreachable DB is one `server.boot_failed` line and a restart.
+try {
+  // Nothing survives a restart (ADR 0010): answers left streaming become stopped, for the chair to keep or retry.
+  const recovered = await store.recoverInterrupted();
+  log.info({ event: "engine.recovered", ...recovered }, "interrupted turns recovered");
+} catch (err) {
+  log.fatal({ event: "server.boot_failed", err }, "boot failed");
+  process.exit(1);
+}
+
+const app = createApp({
+  mount: (a) => a.route("/api", meetingRoutes({ engine, store, llm, hub })),
+});
 
 const server = serve({ fetch: app.fetch, port: config.apiPort }, (info) => {
   log.info(
@@ -36,7 +58,8 @@ const server = serve({ fetch: app.fetch, port: config.apiPort }, (info) => {
 });
 
 /**
- * Graceful stop. k8s sends SIGTERM and waits 30 s: stop taking requests, close the DB pool, exit.
+ * Graceful stop. k8s sends SIGTERM and waits 30 s: stop taking requests, stop running answers (they're saved as
+ * stopped, with their partial text), close the DB pool, exit.
  * ⚠️ Only reachable because the container runs `node` directly, not `pnpm … start`.
  */
 let stopping = false;
@@ -46,6 +69,8 @@ async function shutdown(signal: string) {
   log.info({ event: "server.shutdown", signal }, "shutting down");
   setTimeout(() => process.exit(0), 20_000).unref();
   server.close();
+  engine.stopAll();
+  await Promise.race([engine.waitIdle(), new Promise((r) => setTimeout(r, 10_000))]);
   await closeDb();
   log.info({ event: "server.stopped" }, "shut down cleanly");
   process.exit(0);

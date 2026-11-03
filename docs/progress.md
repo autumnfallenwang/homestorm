@@ -6,6 +6,21 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M5 done: meeting engine.**
+  - The engine runs rounds in the API process: blind rounds start every seat at the same clock value; in-turn rounds
+    start each seat after the previous answer entered the record. One running round per meeting; comments any time.
+  - Stop keeps the partial text hidden until the chair keeps it. Retry reuses the message's cutoff, so the seat gets
+    the same view and the same model. Seats out of allowance, or not on the plan, are refused before any llmgw call.
+    Empty answers and llmgw errors (429, 404, context too long) stay on the message.
+  - Live stream per meeting: a snapshot on connect, then message, delta (with offsets), round, seat and meeting
+    events, with a heartbeat. A restart turns answers left streaming into `stopped`.
+  - Routes for meetings, seats (mute, move, remove, with event lines), the action API, wrap-up, stop, retry, keep,
+    skip, allowance, models and Markdown export.
+  - 48 API tests (13 engine and 7 route integration tests, with a scripted llmgw).
+  - **Real run on localhost:** "cache at the edge or in the API?" Blind round, all three answered independently
+    (3 s). Then an in-turn round where each built on the others by name (8 s). 360 deltas reached the live stream.
+    Turn log lines carry the action's `req_id`, so one Loki query shows the chair's action and every turn it caused.
+  - Fixed: the meetings list counted 0 seats. Drizzle rendered `${meetings.id}` unqualified inside the subqueries.
 - **M4 done: scaffold.**
   - `apps/web`: Next.js 15, Tailwind 4, shadcn components, Geist fonts, the theme with source colors. Builds.
   - API skeleton: config, pino logs in the house shape, Better Auth with one admin (sign-up closes after the first

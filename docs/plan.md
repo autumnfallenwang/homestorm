@@ -94,13 +94,18 @@ cluster.
 - [x] llmgw client (`openai` package) with a smoke test against the real gateway (all three sources)
 - [x] API skeleton: config, pino logging, request log, Better Auth admin login (D3), `reset-password` script
 
-### M5: Meeting engine ⬜
+### M5: Meeting engine ✅
 
-- [ ] Action API: message / round / reply-to / mute / seat changes / stop / retry / wrap up
-- [ ] Round runner: blind (all at once) and in turn (one after another), driven by the server
-- [ ] Live event stream per meeting: message started, text added, finished, error, round status; resume after reload
-- [ ] Saving usage, cost and `req_id` per message; errors surfaced, never switched to another model
-- [ ] Allowance check before a seat takes the floor
+- [x] Action API: message / round / reply-to / mute / seat changes / stop / retry / wrap up
+  (`apps/api/src/routes/meetings.ts`)
+- [x] Round runner: blind (all at once) and in turn (one after another), driven by the server
+  (`apps/api/src/engine/engine.ts`)
+- [x] Live event stream per meeting: message started, text added, finished, error, round status; resume after reload
+- [x] Saving usage, cost and `req_id` per message (estimated until llmgw sends them); errors surfaced, never switched
+  to another model
+- [x] Allowance check before a seat takes the floor
+- [x] Verified on localhost against the real llmgw: a blind round and an in-turn round with Claude Haiku 5.5,
+  GPT-5.6 Luna and DeepSeek Flash
 
 ### M6: Web UI ⬜
 
