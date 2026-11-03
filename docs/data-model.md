@@ -69,6 +69,8 @@ same between turns, which lets prompt caching work. The transcript in the UI is 
   looping (a homework lesson).
 - **The API applies them itself at boot**, before it opens its port, and waits for Postgres if it's still starting
   (`apps/api/src/db/migrate.ts`). There's only ever one API process, so two migrations never race.
+- On every boot after the first, Postgres answers the migrator with "already exists, skipping" NOTICEs. They're
+  logged as `db.notice` at debug level (`apps/api/src/db/index.ts`), not printed.
 - **Why not a Helm hook, like the sibling apps:** on homestorm's first install, the pre-install hook ran before the
   Postgres StatefulSet existed and waited forever. The chart's migrate Job is kept but off.
 

@@ -14,6 +14,10 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     names). The dialog suggests the next free name; adding or renaming to a taken name is refused (409), with the
     reason shown under the name field.
   - Covered by unit tests (`uniqueSeatName`, `seatNameClash`) and an integration test; checked in the browser.
+- **Fix: Postgres notices broke the JSON log contract.** postgres-js prints NOTICEs with `console.log` as multi-line
+  objects. The boot migration gets two on every restart after the first ("schema drizzle already exists, skipping"),
+  so the cluster logs had plain-text lines. Notices now go to the logger as `db.notice` at debug level; an
+  integration test checks that nothing reaches `console.log`.
 
 ## 2026-11-02
 
