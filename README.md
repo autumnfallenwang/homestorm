@@ -6,7 +6,7 @@ who answers whom, and you can join the discussion yourself.
 
 It replaces copy-pasting the same question between the Claude, ChatGPT and Gemini web apps.
 
-**Status:** in development, running on localhost. See [the plan](docs/plan.md) and [progress](docs/progress.md).
+**Status:** v1 is live at http://homestorm.arch.internal. See [the plan](docs/plan.md) and [progress](docs/progress.md).
 
 ## How it works, in short
 

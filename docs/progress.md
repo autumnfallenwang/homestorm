@@ -6,14 +6,23 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
-- **M8 in progress: deploy.**
-  - Dockerfiles, the Helm chart (api with Recreate, web, Postgres StatefulSet, migrate hook), CI and the Argo CD
-    Application, adapted from homework. The api reaches llmgw in-cluster at `llmgw.llmgw.svc.cluster.local`.
-  - The production images ran a real meeting locally: migrations through the hook's command, `node` as PID 1, JSON
-    logs from the first line.
-  - CI passed (tests, both images on GHCR with SHA tags); the images pull anonymously, so the cluster needs no
-    pull secret. The arch-infra bump was skipped: `ARCH_INFRA_TOKEN` isn't set on this repo yet.
-  - DNS: `homestorm.arch.internal` and `homestorm-api.arch.internal` point at Traefik (added by the user).
+- **M8 done: homestorm is live** at http://homestorm.arch.internal (API http://homestorm-api.arch.internal).
+  - Dockerfiles, the Helm chart (api with Recreate, web, Postgres StatefulSet), CI and the Argo CD Application,
+    adapted from homework. The api reaches llmgw in-cluster at `llmgw.llmgw.svc.cluster.local`.
+  - The production images ran a real meeting locally before shipping. CI passed; the GHCR images pull anonymously,
+    so the cluster needs no pull secret.
+  - **First sync found a chart bug:** the Helm pre-install migrate hook ran before the Postgres StatefulSet existed
+    and waited forever. Fix: the API applies its migrations at boot, retrying while Postgres starts; the hook is off.
+    The stuck sync carried the old parameters, so it was ended (operation marked Terminating) and a fresh sync ran.
+  - Checked on the cluster: `/health` OK; unauthenticated calls 401; setup page; sign-up and the session cookie
+    across the two hosts; a blind round streamed through Traefik (DeepSeek V4 Pro showed "Thinking…"); in Loki,
+    `db.migrated`, `server.start` and three `turn.done` lines sharing the action's `req_id`, and no non-JSON lines.
+  - The admin made for that check was deleted, so `/setup` is open for the user. The meeting stays.
+  - The Secret `homestorm-secrets` was created by the user (auto mode doesn't allow Secret writes); values are in the
+    gitignored `private/cluster-secrets.env`.
+  - Argo shows the Postgres StatefulSet as OutOfSync, as it does for homework's: the cluster-wide StatefulSet diff.
+  - Open: `ARCH_INFRA_TOKEN` isn't set on this repo, so CI skips the arch-infra tag bump; tags were bumped by hand.
+- DNS: `homestorm.arch.internal` and `homestorm-api.arch.internal` point at Traefik (added by the user).
 - **M7 done: wrap up, export, login.** Wrap-up (minutes, decision, open questions; posted or kept from the seats) and
   the Markdown export were built with M5/M6 and checked in the browser run. Login gained Change password, covered by
   an integration test.

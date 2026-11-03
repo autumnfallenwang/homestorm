@@ -124,9 +124,13 @@ cluster.
 - [x] Polish from the browser run: plain-text reply quotes, model order (strongest family, newest first), accessible
   @mention list
 
-### M8: Deploy 🔄
+### M8: Deploy ✅
 
 - [x] Dockerfiles, Helm chart with its own Postgres, GHCR images (smoke-tested locally with a real meeting; CI green,
   images publicly pullable)
-- [ ] `arch-infra` app entry, Argo CD sync, hostname
-- [ ] Logs in Loki; first real meeting on the cluster
+- [x] `arch-infra` app entry (`apps/homestorm.yaml`), Argo CD sync, hostnames `homestorm.arch.internal` and
+  `homestorm-api.arch.internal`
+- [x] Logs in Loki; first real meeting on the cluster (a blind round with Claude Sonnet 5.5, GPT-6 Luna and DeepSeek
+  V4 Pro through the browser)
+
+v1 is done. Next candidates are in "Out (later)" above.
