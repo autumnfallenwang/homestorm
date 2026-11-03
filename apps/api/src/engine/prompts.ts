@@ -99,7 +99,7 @@ export function renderFloorNote(floor: Floor): string {
     case "blind":
       parts.push(
         floor.count > 1
-          ? `All ${floor.count} participants answer this independently: you can't see the others' answers and they can't see yours. Give your own view.`
+          ? `${floor.count === 2 ? "Both" : `All ${floor.count}`} participants answer this independently: you can't see the others' answers and they can't see yours. Give your own view.`
           : "Give your own view.",
       );
       break;
@@ -123,6 +123,9 @@ function excerpt(text: string): string {
 export function trimmedNote(count: number): string {
   return `(${count} older message${count === 1 ? "" : "s"} trimmed to fit the context window.)`;
 }
+
+/** Ends an answer the chair stopped and then kept, so no seat takes the cut-off text for a finished answer. */
+export const CUT_OFF_NOTE = "(The Chair stopped this answer here.)";
 
 /** Stands in for a meeting that starts with a seat speaking, so the view still begins with a user turn. */
 export const MEETING_STARTED = "(The meeting has started.)";

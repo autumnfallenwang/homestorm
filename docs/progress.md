@@ -6,6 +6,31 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-03
 
+- **Live test on localhost:** a 5-seat meeting run step by step, with the chair deciding each question from the
+  answers. The seats were Claude Opus 5.5, GPT-6 Luna, DeepSeek V4 Pro, "The Skeptic" (GPT-6 Luna with a persona)
+  and "Scribe" (DeepSeek Flash, muted). The topic: one shared Postgres for the cluster's apps, or one per app.
+  - **Rounds:**
+    - a blind first round (2–2);
+    - an in-turn reaction round;
+    - a reply to one message with two seats answering blind;
+    - a comment with checked cluster facts (one node, local-path, five databases, no backup jobs);
+    - @mentions with a new constraint;
+    - a Detailed round with Stop, Keep partial, Skip and Retry;
+    - blind final positions (unanimous: back up now, consolidate later);
+    - a decision written by Scribe, then the export.
+  - **Everything matched the design:** cutoffs in blind and in-turn rounds, comments, targets, Retry with the saved
+    cutoff and its 409 once others have spoken, a muted seat writing the wrap-up, and the persona.
+  - **Found and fixed:**
+    - the output cap left no room for thinking (below);
+    - the floor note said "All 2 participants": now "Both participants";
+    - a kept partial reached other seats unmarked: it now ends with "(The Chair stopped this answer here.)"
+      ([ADR 0013](adr/0013-intro-and-floor-note-templates.md));
+    - room-rule changes left no event line: they now add "You set answers to Detailed";
+    - the export dropped skipped turns, didn't name who a reply went to, and cut personas mid-word.
+  - **Wrap-ups are now held back for review.** Scribe's decision had the right answer but several wrong details
+    (it counted itself as a participant and put The Skeptic on the wrong option). A wrap-up now starts "not
+    posted", with **Post to the meeting** under it; posting adds an event line. "Post it right away" in the dialog
+    skips the review.
 - **Fix: DeepSeek V4 Pro returned an empty answer** in the live test's blind round ("empty_answer" after 46 s).
   llmgw's usage line showed exactly 2,048 output tokens: the Concise cap. DeepSeek counts thinking inside
   `max_tokens`, so it spent the whole cap thinking.

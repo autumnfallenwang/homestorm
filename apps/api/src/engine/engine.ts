@@ -58,6 +58,13 @@ export interface EngineOptions {
 
 const RUNNING_ROUND = "A round is running. Wait for it to finish, or stop it first.";
 
+/** How event lines name a wrap-up, e.g. "You posted Scribe's decision". */
+const WRAP_NOUN: Record<WrapKind, string> = {
+  minutes: "minutes",
+  decision: "decision",
+  open_questions: "open questions",
+};
+
 export class Engine {
   private readonly store: Store;
   private readonly llm: LlmClient;
@@ -264,6 +271,24 @@ export class Engine {
     });
     await this.emitMeeting(meetingId);
     return kept;
+  }
+
+  /** Post a wrap-up the chair held back to review (ADR 0007): it enters the shared record now. */
+  async post(meetingId: string, messageId: string): Promise<Message> {
+    const msg = await this.store.getMessage(meetingId, messageId);
+    if (!msg) throw new EngineError(404, "Message not found");
+    if (!msg.wrapKind || msg.status !== "done" || !msg.hiddenFromSeats) {
+      throw new EngineError(409, "Only a finished wrap-up that isn't posted yet can be posted.");
+    }
+    const visibleSeq = await this.store.bumpClock(meetingId);
+    const posted = await this.patch(msg, { hiddenFromSeats: false, visibleSeq });
+    await this.emitMeeting(meetingId);
+    const seat = msg.seatId ? await this.store.getSeat(meetingId, msg.seatId) : null;
+    await this.addEvent(
+      meetingId,
+      `You posted ${seat?.displayName ?? "a former seat"}'s ${WRAP_NOUN[msg.wrapKind]}`,
+    );
+    return posted;
   }
 
   /** Skip a turn that failed, was stopped, or hasn't started. */

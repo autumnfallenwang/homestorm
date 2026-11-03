@@ -70,7 +70,7 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
   };
 
   for (const m of messages) {
-    if (m.status === "queued" || m.status === "skipped") continue;
+    if (m.status === "queued") continue;
     if (m.authorKind === "event") {
       out.push(`_${m.content}_`, "");
       continue;
@@ -82,15 +82,19 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
 
     if (m.authorKind === "chair") {
       const target = m.replyToId ? byId.get(m.replyToId) : undefined;
-      const where = target
-        ? `replying to ${name(target)}`
-        : m.sendMode === "none"
+      const where =
+        m.sendMode === "none"
           ? "comment, no reply"
           : m.sendMode === "seats"
             ? `to ${(m.targetSeatIds ?? []).map((id) => seatById.get(id)?.displayName ?? "?").join(", ")}`
             : `to everyone · ${m.sendMode === "in_turn" ? "in turn" : "blind"}`;
-      out.push(`**Chair** · ${where}`, "");
+      out.push(`**Chair** · ${target ? `${where} · replying to ${name(target)}` : where}`, "");
       if (m.content) out.push(quote(m.content), "");
+      continue;
+    }
+
+    if (m.status === "skipped") {
+      out.push(`_${name(m)} skipped this turn_`, "");
       continue;
     }
 
@@ -119,6 +123,8 @@ function quote(text: string): string {
     .join("\n");
 }
 
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").replace(/\|/g, "\\|").slice(0, 120);
+function oneLine(text: string, max = 120): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const cut = flat.length > max ? `${flat.slice(0, max).trimEnd()}…` : flat;
+  return cut.replace(/\|/g, "\\|");
 }

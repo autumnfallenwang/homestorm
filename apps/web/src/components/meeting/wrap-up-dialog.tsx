@@ -46,7 +46,8 @@ export function WrapUpDialog({ open, onClose }: { open: boolean; onClose: () => 
   const seats = state.seats.filter((s) => !s.removedAt);
   const [seatId, setSeatId] = useState<string>("");
   const [kind, setKind] = useState<WrapKind>("minutes");
-  const [post, setPost] = useState(true);
+  // Off by default: wrap-ups get facts wrong sometimes, so the chair reads it before the seats do.
+  const [post, setPost] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export function WrapUpDialog({ open, onClose }: { open: boolean; onClose: () => 
         </div>
         <label className="flex items-center gap-2.5 text-sm">
           <Checkbox checked={post} onCheckedChange={(c) => setPost(c === true)} />
-          Post it in the meeting so every seat can see it
+          Post it right away, without reviewing it first
         </label>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

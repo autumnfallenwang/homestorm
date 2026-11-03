@@ -62,7 +62,7 @@ with it, so you get one opinion three times. Answering separately first is what 
 | **Mute / unmute** | A muted seat is skipped in rounds, but still sees the whole meeting and can be asked directly. |
 | **Add / remove seat, reorder** | Seat order is the order for in-turn rounds. |
 | **Stop / retry** | Stop one seat or all seats. Retry reruns the same seat on the same view, always with the same model. |
-| **Wrap up** | One seat the chair picks writes the minutes, a decision with reasons, or the open questions. Optionally posted in the meeting so every seat sees it. |
+| **Wrap up** | One seat the chair picks writes the minutes, a decision with reasons, or the open questions. The chair reads it first, then posts it in the meeting so every seat sees it. |
 
 ### The visibility rule (the only one)
 
@@ -182,8 +182,9 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
 6. **Seat states.** Always labeled in words, not only by color: Answering, Next, Idle, Muted, Rate limited,
    Out of allowance. Rate limited and out-of-allowance seats can't take the floor until reset; the card shows when.
 7. **Wrap up dialog.** Pick who writes it, then Minutes (the question, each seat's position, where they agreed and
-   disagreed) / Decision and reasons / Open questions, then "Post it in the meeting so every seat can see it", then
-   Write minutes.
+   disagreed) / Decision and reasons / Open questions, then Write minutes. The wrap-up is held back for the chair
+   to read ("not posted"), with **Post to the meeting** under it; "Post it right away" in the dialog skips that
+   review. (Changed 2026-11-03: the live test's decision got several who-said-what details wrong.)
 8. **Problems stay visible** in place, never as a quiet switch to another model:
    - Rate limited (429), with Retry / Skip this turn.
    - Stopped by you, with Keep partial / Retry.

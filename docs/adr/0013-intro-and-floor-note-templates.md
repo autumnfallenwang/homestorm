@@ -28,6 +28,8 @@ now): ADRs [0004](0004-per-seat-view-of-shared-transcript.md) and
     - in turn, "You are 2nd of 3";
     - reply to a message, quoting its first 300 characters;
     - wrap up as minutes, a decision, or open questions.
+  - **Cut-off note** (added 2026-11-03): an answer the chair stopped and kept ends with "(The Chair stopped this
+    answer here.)", in every view including its author's, so no seat reads the cut-off text as a finished answer.
 - **No user-editable templates in v1.** Only the persona is per seat.
 - **Unit tests pin the wording's key parts:** the roster, the disagree-with-the-chair rule, no name prefix, and the
   floor notes.

@@ -11,9 +11,11 @@
 // 6. Visibility (ADR 0005): a seat sees the messages that entered the record before its turn started
 //    (visible_seq <= cutoff_seq). Comments ("events"), unfinished answers and unposted minutes are never shown.
 // 7. Long meetings (ADR 0012): over budget, the oldest messages are dropped, but the first chair message stays.
+// 8. An answer the chair stopped and kept ends with a note saying so, so it isn't read as a finished answer.
 
 import type { AnswerLength, Message, Seat, WrapKind } from "@homestorm/shared";
 import {
+  CUT_OFF_NOTE,
   type Floor,
   MEETING_STARTED,
   type RosterEntry,
@@ -101,12 +103,13 @@ export function buildView(input: ViewInput): View {
   const floor = renderFloorNote(input.floor);
 
   const items: Item[] = visibleMessages(messages, input.cutoffSeq).map((m) => {
+    const content = m.stoppedEarly ? `${m.content}\n\n${CUT_OFF_NOTE}` : m.content;
     if (m.authorKind === "seat" && m.seatId === seat.id) {
-      return { role: "assistant", content: m.content, isChair: false };
+      return { role: "assistant", content, isChair: false };
     }
     return {
       role: "user",
-      content: `${speakerTag(m)}: ${m.content}`,
+      content: `${speakerTag(m)}: ${content}`,
       isChair: m.authorKind === "chair",
     };
   });

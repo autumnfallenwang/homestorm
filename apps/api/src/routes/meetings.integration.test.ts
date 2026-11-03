@@ -281,6 +281,100 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(res.text).toContain("answer from claude-opus-5-5");
   });
 
+  it("exports skipped turns, who a reply went to, and long personas cut with an ellipsis", async () => {
+    const { call, engine, llm } = setup();
+    llm.on("gpt-6-luna", { chunks: [] }, { chunks: ["Pushing back."] });
+    const id = (await call("POST", "/api/meetings", { title: "Export details" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, {
+      model: "claude-opus-5-5",
+      persona: `Play the skeptic. ${"Push back on extra work. ".repeat(10)}`,
+    });
+    const gpt = (await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" })).body;
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Q",
+      mode: "blind",
+      targets: "everyone",
+    });
+    await engine.waitIdle(id);
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    const failed = state.messages.find((m) => m.seatId === gpt.id)!;
+    const claudeAnswer = state.messages.find(
+      (m) => m.authorKind === "seat" && m.seatId !== gpt.id,
+    )!;
+    expect(failed.status).toBe("error");
+    expect((await call("POST", `/api/meetings/${id}/messages/${failed.id}/skip`)).status).toBe(200);
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Push back",
+      mode: "blind",
+      targets: [gpt.id],
+      replyTo: claudeAnswer.id,
+    });
+    await engine.waitIdle(id);
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("_GPT-6 Luna skipped this turn_");
+    expect(md).toContain("**Chair** · to GPT-6 Luna · replying to Claude Opus 5.5");
+    expect(md).toMatch(/persona: Play the skeptic\. Push back on extra work\.[^|]*…/);
+  });
+
+  it("records room-rule changes, and posts a wrap-up only when the chair says so", async () => {
+    const { call, engine, llm } = setup();
+    llm.on("claude-opus-5-5", { chunks: ["Answer."] }, { chunks: ["DECISION: B"] });
+    const id = (await call("POST", "/api/meetings", { title: "Rules" })).body.id as string;
+    const claude = (await call("POST", `/api/meetings/${id}/seats`, { model: "claude-opus-5-5" }))
+      .body;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" });
+
+    await call("PATCH", `/api/meetings/${id}`, { answerLength: "detailed" });
+    await call("PATCH", `/api/meetings/${id}`, { answerLength: "detailed" });
+    await call("PATCH", `/api/meetings/${id}`, { defaultMode: "in_turn" });
+    const events = async () =>
+      ((await call("GET", `/api/meetings/${id}`)).body as MeetingState).messages
+        .filter((m) => m.authorKind === "event")
+        .map((m) => m.content);
+    expect(await events()).toEqual([
+      "You added Claude Opus 5.5",
+      "You added GPT-6 Luna",
+      "You set answers to Detailed",
+      "You set new questions to go to everyone · in turn",
+    ]);
+
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Q",
+      mode: "blind",
+      targets: [claude.id],
+    });
+    await engine.waitIdle(id);
+    // No "post" field: the wrap-up is held back for the chair to review.
+    await call("POST", `/api/meetings/${id}/wrap-up`, { seatId: claude.id, kind: "decision" });
+    await engine.waitIdle(id);
+    let state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    const decision = state.messages.find((m) => m.wrapKind === "decision")!;
+    expect(decision).toMatchObject({ status: "done", hiddenFromSeats: true, visibleSeq: null });
+
+    const posted = await call("POST", `/api/meetings/${id}/messages/${decision.id}/post`);
+    expect(posted.status).toBe(200);
+    state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(posted.body).toMatchObject({ hiddenFromSeats: false, visibleSeq: state.meeting.clock });
+    expect((await events()).at(-1)).toBe("You posted Claude Opus 5.5's decision");
+    expect((await call("POST", `/api/meetings/${id}/messages/${decision.id}/post`)).status).toBe(
+      409,
+    );
+
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Agreed?",
+      mode: "blind",
+      targets: "everyone",
+    });
+    await engine.waitIdle(id);
+    const gptView = llm
+      .callsFor("gpt-6-luna")
+      .at(-1)!
+      .messages.map((m) => m.content)
+      .join("\n");
+    expect(gptView).toContain("[Claude Opus 5.5, decision]: DECISION: B");
+  });
+
   it("deletes a meeting", async () => {
     const { call } = setup();
     const id = (await call("POST", "/api/meetings", { title: "T" })).body.id as string;

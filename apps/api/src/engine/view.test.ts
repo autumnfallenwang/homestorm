@@ -1,6 +1,12 @@
 import type { Message, Seat } from "@homestorm/shared";
 import { describe, expect, it } from "vitest";
-import { MEETING_STARTED, REPLY_EXCERPT_CHARS, renderFloorNote, renderIntro } from "./prompts.js";
+import {
+  CUT_OFF_NOTE,
+  MEETING_STARTED,
+  REPLY_EXCERPT_CHARS,
+  renderFloorNote,
+  renderIntro,
+} from "./prompts.js";
 import { buildView, stripSpeakerTag, type ViewInput, visibleMessages } from "./view.js";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -212,6 +218,21 @@ describe("buildView: visibility", () => {
     expect(v.messages[1]?.content).toContain("You answer 2nd of 2, in turn.");
   });
 
+  it("marks an answer the chair stopped and kept, for the other seats and its author", () => {
+    seq = 0;
+    const q = chair("Plan the weekend.", { sendMode: "in_turn" });
+    const a = said(claude, "Saturday: set up the bucket. Assumptions: the", { stoppedEarly: true });
+    const other = view([q, a], gpt, { floor: { kind: "in_turn", index: 2, count: 2 } });
+    expect(other.messages[1]?.content).toContain(
+      `[Claude Opus 5.5]: Saturday: set up the bucket. Assumptions: the\n\n${CUT_OFF_NOTE}`,
+    );
+    const own = view([q, a], claude);
+    expect(own.messages[2]).toEqual({
+      role: "assistant",
+      content: `Saturday: set up the bucket. Assumptions: the\n\n${CUT_OFF_NOTE}`,
+    });
+  });
+
   it("leaves out comments, unfinished answers, failures and unposted minutes", () => {
     seq = 0;
     const transcript = [
@@ -326,6 +347,9 @@ describe("renderFloorNote", () => {
     expect(renderFloorNote({ kind: "direct" })).toBe("[Floor] The Chair asks you to speak now.");
     expect(renderFloorNote({ kind: "blind", count: 3 })).toContain(
       "All 3 participants answer this independently",
+    );
+    expect(renderFloorNote({ kind: "blind", count: 2 })).toContain(
+      "Both participants answer this independently",
     );
     expect(renderFloorNote({ kind: "in_turn", index: 1, count: 3 })).toContain(
       "You answer 1st of 3, in turn. The others will see your answer",

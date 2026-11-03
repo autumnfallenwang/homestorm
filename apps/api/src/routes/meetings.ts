@@ -4,7 +4,7 @@
 //   GET    /api/meetings                               meetings list
 //   POST   /api/meetings                               create { title }
 //   GET    /api/meetings/:id                           the whole meeting (MeetingState)
-//   PATCH  /api/meetings/:id                           rename, room rules
+//   PATCH  /api/meetings/:id                           rename, room rules (a rule change adds an event line)
 //   DELETE /api/meetings/:id
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
@@ -16,7 +16,7 @@
 //   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo } (ADR 0006)
 //   POST   /api/meetings/:id/wrap-up                   { seatId, kind, post }
 //   POST   /api/meetings/:id/stop                      { messageId? }
-//   POST   /api/meetings/:id/messages/:mid/retry|keep|skip
+//   POST   /api/meetings/:id/messages/:mid/retry|keep|skip|post
 
 import {
   AddSeatInput,
@@ -106,9 +106,24 @@ export function meetingRoutes(deps: MeetingDeps) {
   app.patch("/meetings/:id", async (c) => {
     const input = await parse(c, UpdateMeetingInput);
     if (input instanceof Response) return input;
-    const meeting = await store.updateMeeting(c.req.param("id"), input);
+    const before = await store.getMeeting(c.req.param("id"));
+    if (!before) return c.json({ error: "Not found" }, 404);
+    const meeting = await store.updateMeeting(before.id, input);
     if (!meeting) return c.json({ error: "Not found" }, 404);
     engine.emit(meeting.id, { type: "meeting", meeting });
+    // Room rules shape every later turn, so the transcript and the export record when they changed.
+    if (meeting.answerLength !== before.answerLength) {
+      await engine.addEvent(
+        meeting.id,
+        `You set answers to ${meeting.answerLength === "detailed" ? "Detailed" : "Concise"}`,
+      );
+    }
+    if (meeting.defaultMode !== before.defaultMode) {
+      await engine.addEvent(
+        meeting.id,
+        `You set new questions to go to everyone · ${meeting.defaultMode === "in_turn" ? "in turn" : "blind"}`,
+      );
+    }
     return c.json(meeting);
   });
 
@@ -320,7 +335,7 @@ export function meetingRoutes(deps: MeetingDeps) {
     }
   });
 
-  for (const action of ["retry", "keep", "skip"] as const) {
+  for (const action of ["retry", "keep", "skip", "post"] as const) {
     app.post(`/meetings/:id/messages/:mid/${action}`, async (c) => {
       try {
         const result = await engine[action](c.req.param("id"), c.req.param("mid"));

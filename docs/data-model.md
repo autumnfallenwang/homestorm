@@ -21,7 +21,8 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
   messages by name. Several seats may use the same model: the default names are "Claude Opus 5.5", then
   "Claude Opus 5.5 (2)". The API refuses a taken name with 409 (`seatNameClash` in `packages/shared/src/names.ts`).
 - **Event lines** ("You muted Claude Sonnet 5.5 for rounds") are messages with `author_kind = 'event'`. Seats never
-  see them.
+  see them. Room-rule changes ("You set answers to Detailed") and posting a wrap-up ("You posted Scribe's decision")
+  add one too, so the transcript and the export show when they happened.
 - **Tracing fields** on seat messages: `model`, `owned_by`, `reasoning_effort`, `usage` (with an `estimated` flag),
   `cost_usd`, `llmgw_req_id`, `request_id` (homestorm's, sent as `X-Request-Id`), `trimmed_count`, `started_at`,
   `finished_at` ([ADR 0009](adr/0009-first-version-scope.md)).
@@ -37,7 +38,8 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 | `error` | llmgw failed, or the seat couldn't take the floor (rate limited, out of allowance) | no |
 | `skipped` | the chair skipped the turn | no |
 
-Unposted wrap-up output has `hidden_from_seats = true`: the chair sees it, seats never do.
+Wrap-up output starts with `hidden_from_seats = true`: the chair sees it, seats don't. **Post** clears it and gives it
+the next clock value, so it enters the record at the moment it's posted, like a kept answer.
 
 ## The visibility rule, as a logical clock
 

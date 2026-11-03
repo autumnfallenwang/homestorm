@@ -247,6 +247,7 @@ function SeatMessage({ message, inRound }: { message: Message; inRound: boolean 
         ) : null}
 
         <Problem message={message} />
+        <PostWrapUp message={message} />
 
         {(message.status === "done" || message.status === "stopped") && (
           <MetaLine message={message} />
@@ -292,6 +293,33 @@ function MetaLine({ message }: { message: Message }) {
       {message.trimmedCount > 0 && ` · older turns trimmed (${message.trimmedCount})`}
       {message.stoppedEarly && " · stopped early, kept"}
     </p>
+  );
+}
+
+/** A wrap-up waits for the chair's review before the seats see it (ADR 0007). */
+function PostWrapUp({ message }: { message: Message }) {
+  const { id, act } = useRoom();
+  const [busy, setBusy] = useState(false);
+  if (!message.wrapKind || message.status !== "done" || !message.hiddenFromSeats) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border bg-muted/40 px-3 py-2">
+      <p className="text-xs text-muted-foreground">
+        Only you can see this. Check it, then post it.
+      </p>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          await act(() => api.post(id, message.id));
+          setBusy(false);
+        }}
+      >
+        {busy ? <Loader2 className="animate-spin" /> : <Check />}
+        Post to the meeting
+      </Button>
+    </div>
   );
 }
 

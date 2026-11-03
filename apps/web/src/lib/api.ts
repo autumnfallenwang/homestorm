@@ -95,6 +95,8 @@ export const api = {
     request<Message>("POST", `/api/meetings/${id}/messages/${messageId}/keep`, {}),
   skip: (id: string, messageId: string) =>
     request<Message>("POST", `/api/meetings/${id}/messages/${messageId}/skip`, {}),
+  post: (id: string, messageId: string) =>
+    request<Message>("POST", `/api/meetings/${id}/messages/${messageId}/post`, {}),
   exportUrl: (id: string) => `${apiBaseUrl()}/api/meetings/${id}/export.md`,
   eventsUrl: (id: string) => `${apiBaseUrl()}/api/meetings/${id}/events`,
 };

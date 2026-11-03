@@ -261,8 +261,8 @@ export type SendAction = z.output<typeof SendActionInput>;
 export const WrapUpInput = z.object({
   seatId: z.string().uuid(),
   kind: z.enum(WRAP_KINDS),
-  /** Post it in the meeting so every seat sees it. */
-  post: z.boolean().default(true),
+  /** Post it in the meeting so every seat sees it. Off by default: the chair reviews it first, then posts it. */
+  post: z.boolean().default(false),
 });
 export type WrapUpInput = z.input<typeof WrapUpInput>;
 
