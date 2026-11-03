@@ -107,12 +107,14 @@ cluster.
 - [x] Verified on localhost against the real llmgw: a blind round and an in-turn round with Claude Haiku 5.5,
   GPT-5.6 Luna and DeepSeek Flash
 
-### M6: Web UI ⬜
+### M6: Web UI ✅
 
-- [ ] Three-pane layout per [ADR 0007](adr/0007-three-pane-meeting-ui.md) and the mockup
-- [ ] Message box with send-to selector and @mentions; hover bar with Reply to / Retry / Copy
-- [ ] Seats panel with live status and allowance; add-seat dialog; seat menu
-- [ ] Streaming Markdown rendering; round boxes; event lines; problem states
+- [x] Three-pane layout per [ADR 0007](adr/0007-three-pane-meeting-ui.md) and the mockup
+- [x] Message box with send-to selector and @mentions; hover bar with Reply to / Retry / Copy
+- [x] Seats panel with live status and allowance; add-seat dialog; seat menu
+- [x] Streaming Markdown rendering; round boxes; event lines; problem states
+- [x] Driven in a real browser on localhost against the real llmgw (blind round, reply-to, @mention, stop and keep,
+  mute, wrap-up, export, phone width)
 
 ### M7: Wrap up, export, polish ⬜
 

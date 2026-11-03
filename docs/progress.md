@@ -6,6 +6,24 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M6 done: web UI.**
+  - **Three panes, as in the mockup:**
+    - meetings list (new, search, grouped by day, Live and Minutes badges, the chair's menu);
+    - the meeting (header with status, tokens, Export, Wrap up; chair bubbles on the right with where each went;
+      seat messages with source tag, Markdown and the mono meta line; round boxes with progress; event lines;
+      problems in place with Retry / Skip / Keep partial / Mute until reset);
+    - the seats panel (status in words, allowance bar, Ask / Mute / ⋯, room rules).
+  - Message box: send-to selector, @mentions that become structured targets, blind / in-turn toggle for several
+    seats, Stop all, and a status line while a round runs.
+  - Dialogs: new meeting, add seat (models grouped by source with allowance, "Not on your plan" crossed out),
+    edit seat, reply-to picker, wrap up, delete. Live state comes from the stream through a tested reducer.
+  - **Driven in a real browser** (Playwright, localhost, real llmgw): a blind round streamed from all three seats;
+    reply-to with a note; an @mention; Stop and Keep partial; mute; minutes written by GPT and posted; Markdown
+    export; phone width.
+  - **Bug found and fixed in that run:** the openai SDK ends a stream quietly when it's aborted, so Stop saved a
+    cut-off answer as done. The client and the engine now treat an aborted stream as stopped; a regression test
+    covers it.
+  - Accessibility: the @mention list is a proper combobox, labels on every control, states in words.
 - **M5 done: meeting engine.**
   - The engine runs rounds in the API process: blind rounds start every seat at the same clock value; in-turn rounds
     start each seat after the previous answer entered the record. One running round per meeting; comments any time.

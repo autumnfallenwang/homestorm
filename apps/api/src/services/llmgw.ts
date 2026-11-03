@@ -114,6 +114,9 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
       } catch (err) {
         throw toLlmError(err, turn.signal);
       }
+      // ⚠️ The openai SDK ends the stream QUIETLY when the signal aborts: no throw. Without this check a stopped
+      // answer looked finished (found in the M6 browser run: Stop all saved a cut-off answer as done).
+      if (turn.signal?.aborted) throw new DOMException("The answer was stopped", "AbortError");
       yield { type: "done", finishReason, usage, costUsd, llmgwReqId };
     },
 

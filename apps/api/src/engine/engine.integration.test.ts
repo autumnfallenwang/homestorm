@@ -214,6 +214,27 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     );
   });
 
+  it("a stop counts even when the client ends the stream quietly on abort", async () => {
+    const w = await world();
+    w.llm.on("claude-opus-5-5", {
+      chunks: ["Cut off mid"],
+      hangAfterChunks: true,
+      quietAbort: true,
+    });
+    await w.engine.send(w.meeting.id, {
+      text: "Q",
+      mode: "blind",
+      targets: [w.claude.id],
+      replyTo: null,
+    });
+    await until(async () => (await seatMessages(w.meeting.id))[0]?.content === "Cut off mid");
+    await w.engine.stop(w.meeting.id);
+    await w.engine.waitIdle(w.meeting.id);
+    const m = (await seatMessages(w.meeting.id))[0]!;
+    expect(m.status).toBe("stopped");
+    expect(m.visibleSeq).toBeNull();
+  });
+
   it("stop all skips seats still waiting in an in-turn round", async () => {
     const w = await world();
     w.llm.on("claude-opus-5-5", { chunks: ["Going on"], hangAfterChunks: true });

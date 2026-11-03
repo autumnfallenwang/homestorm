@@ -48,6 +48,21 @@
       },
       "style": {
         "noNonNullAssertion": "off"
+      },
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": [
+              "Checkbox",
+              "RadioGroupItem",
+              "Select",
+              "SelectTrigger",
+              "Input",
+              "Textarea"
+            ]
+          }
+        }
       }
     }
   },

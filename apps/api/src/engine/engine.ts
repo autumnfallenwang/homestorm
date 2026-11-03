@@ -135,7 +135,7 @@ export class Engine {
     let replyTo: Message | null = null;
     if (action.replyTo) {
       replyTo = await this.store.getMessage(meetingId, action.replyTo);
-      if (!replyTo || replyTo.status !== "done" || replyTo.authorKind === "event") {
+      if (replyTo?.status !== "done" || replyTo.authorKind === "event") {
         throw new EngineError(400, "That message can't be replied to.");
       }
       if (replyTo.authorKind === "seat" && targets.some((s) => s.id === replyTo?.seatId)) {
@@ -214,7 +214,7 @@ export class Engine {
     const meeting = await this.requireMeeting(meetingId);
     if (this.isRunning(meetingId)) throw new EngineError(409, RUNNING_ROUND);
     const msg = await this.store.getMessage(meetingId, messageId);
-    if (!msg || msg.authorKind !== "seat" || !msg.roundId || !msg.seatId) {
+    if (msg?.authorKind !== "seat" || !msg.roundId || !msg.seatId) {
       throw new EngineError(404, "Seat message not found");
     }
     const seat = await this.store.getSeat(meetingId, msg.seatId);
@@ -612,6 +612,8 @@ export class Engine {
           done = ev;
         }
       }
+      // A stream that ended because we aborted it is a stop, however the client reported it.
+      if (ac.signal.aborted) throw new DOMException("The answer was stopped", "AbortError");
       const content = stripSpeakerTag(text).trim();
       if (!content) {
         result = {

@@ -10,6 +10,8 @@ export interface Script {
   delayMs?: number;
   /** After the chunks, hang until the call is aborted (to test Stop). */
   hangAfterChunks?: boolean;
+  /** On abort, end the stream quietly instead of throwing (what the openai SDK does). */
+  quietAbort?: boolean;
   /** Throw this after the chunks. */
   error?: LlmError;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
@@ -64,7 +66,15 @@ export class FakeLlm implements LlmClient {
       await sleep(script.delayMs ?? 1, turn.signal);
       yield { type: "text", text: chunk };
     }
-    if (script.hangAfterChunks) await sleep(60_000, turn.signal);
+    if (script.hangAfterChunks) {
+      try {
+        await sleep(60_000, turn.signal);
+      } catch (err) {
+        if (!script.quietAbort) throw err;
+        yield { type: "done", finishReason: null, usage: null, costUsd: null, llmgwReqId: null };
+        return;
+      }
+    }
     if (script.error) throw script.error;
     yield {
       type: "done",
