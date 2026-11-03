@@ -22,7 +22,7 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
 
 | Doc | What's in it |
 |---|---|
-| [docs/plan.md](docs/plan.md) | First-version scope, milestones with status, open decisions |
+| [docs/plan.md](docs/plan.md) | First-version scope, milestones with status, decisions |
 | [docs/progress.md](docs/progress.md) | Dated log of what was done and decided |
 | [docs/adr/](docs/adr/) | Architecture decision records, one decision each |
 | [docs/chat-wrapper-research.md](docs/chat-wrapper-research.md) | The llmgw backend, existing chat apps compared, wrapper features, how each seat's view is built |
@@ -46,3 +46,8 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0006](docs/adr/0006-control-in-code-etiquette-in-prompts.md) | Floor control is server code behind one action API; only etiquette is natural language |
 | [0007](docs/adr/0007-three-pane-meeting-ui.md) | A three-pane meeting UI, as in the mockup |
 | [0008](docs/adr/0008-name-homestorm.md) | The app is called homestorm |
+| [0009](docs/adr/0009-first-version-scope.md) | First-version scope; tracing saves what llmgw returns, plus a token estimate |
+| [0010](docs/adr/0010-rounds-run-on-the-server.md) | Rounds run on the server; one live stream per meeting; one API instance |
+| [0011](docs/adr/0011-one-admin-login.md) | One admin login with Better Auth, created at first-run setup |
+| [0012](docs/adr/0012-long-meetings-answer-length-effort.md) | Long meetings trimmed per seat; Concise / Detailed; per-seat thinking effort |
+| [0013](docs/adr/0013-intro-and-floor-note-templates.md) | Intro and floor-note templates fixed in code |

@@ -37,5 +37,5 @@ The chair needs to trust that each reply came from the model shown: no silent su
 
 - homestorm holds no provider keys. Adding or removing a source is an llmgw change.
 - llmgw is a dependency: if it's down, the meeting can't proceed.
-- **Account question (D6):** how llmgw signs in to each provider is an account decision tracked outside this repo
-  (see [plan](../plan.md)). homestorm's code doesn't change whichever way it goes.
+- **How llmgw signs in to each provider** is llmgw's business, not homestorm's (D6, closed). homestorm's code is the
+  same either way.

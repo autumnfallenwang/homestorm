@@ -35,17 +35,17 @@ titles, branching a meeting, memory across meetings.
 
 ---
 
-## Open decisions
+## Decisions
 
-| # | Decision | Recommendation | Status |
-|---|---|---|---|
-| D1 | v1 scope | As listed above | open |
-| D2 | Where rounds run, and how the browser gets live updates | **On the server.** The browser sends an action; the server calls llmgw and saves every token as it streams. The browser follows one live stream (SSE) per meeting. Closing the tab doesn't kill a round, and reloading resumes it. One API instance, so no Redis or queue. | open |
-| D3 | Login | Better Auth with a single admin, as in homecal and homework, since the app spends DeepSeek balance and subscription allowance. Alternative: no login, internal network only. | open |
-| D4 | Long meetings, answer length, thinking effort | **Long meetings:** when a meeting outgrows a seat's model limit, drop the oldest turns but keep the intro and the first question, and show "older turns trimmed" in the UI. Summaries come later. **"Concise":** an instruction plus a cap on output tokens. **Thinking effort:** a per-seat `reasoning_effort` setting, defaulting to low or medium. | open |
-| D5 | Seat intro and floor-note wording | Fixed templates in code with the persona appended; drafted by Claude, reviewed by the user. | open |
-| D6 | How llmgw signs in to Claude | An account decision, tracked privately. homestorm's code is the same either way. | open: the user's call |
-| D7 | Name | **homestorm** ([ADR 0008](adr/0008-name-homestorm.md)) | decided |
+| # | Decision | Status |
+|---|---|---|
+| D1 | v1 scope: as listed above; tracing saves llmgw's usage, cost and `req_id` when llmgw returns them, and an estimate until then | decided: [ADR 0009](adr/0009-first-version-scope.md) |
+| D2 | Rounds run on the server; one live stream (SSE) per meeting; one API instance | decided: [ADR 0010](adr/0010-rounds-run-on-the-server.md) |
+| D3 | Login: Better Auth, one admin created at first-run `/setup` | decided: [ADR 0011](adr/0011-one-admin-login.md) |
+| D4 | Long meetings trimmed per seat; *Concise* / *Detailed* answers; per-seat `reasoning_effort`, default `low` | decided: [ADR 0012](adr/0012-long-meetings-answer-length-effort.md) |
+| D5 | Intro and floor-note templates fixed in code, persona appended | decided: [ADR 0013](adr/0013-intro-and-floor-note-templates.md) |
+| D6 | How llmgw signs in to Claude | closed: not a homestorm concern; homestorm only uses llmgw's API |
+| D7 | Name | decided: **homestorm** ([ADR 0008](adr/0008-name-homestorm.md)) |
 
 When a decision is made, record it as an ADR in [adr/](adr/), update this table, and log it in
 [progress.md](progress.md).
@@ -55,6 +55,9 @@ When a decision is made, record it as an ADR in [adr/](adr/), update this table,
 ## Milestones
 
 Status: ✅ done · 🔄 in progress · ⬜ not started
+
+All development and checks run on localhost (web on :3000, API on :3001, Postgres on :5433) until M8 deploys to the
+cluster.
 
 ### M0: LLM backend ready ✅
 
@@ -71,9 +74,9 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
 - [x] Name: homestorm
 - [x] Repo with ADRs 0001–0008, plan and progress docs
 
-### M2: Open decisions settled 🔄
+### M2: Open decisions settled ✅
 
-- [ ] D1–D6 above decided and recorded as ADRs
+- [x] D1–D5 decided and recorded as ADRs 0009–0013; D6 closed as outside homestorm
 
 ### M3: Data model and per-seat view ⬜
 

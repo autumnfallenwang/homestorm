@@ -6,6 +6,17 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-02
 
+- **M2 done: decisions recorded.**
+  - D1 v1 scope: [ADR 0009](adr/0009-first-version-scope.md).
+  - D2 server-run rounds, one SSE stream per meeting: [ADR 0010](adr/0010-rounds-run-on-the-server.md).
+  - D3 one admin login: [ADR 0011](adr/0011-one-admin-login.md).
+  - D4 trimming, answer length, thinking effort: [ADR 0012](adr/0012-long-meetings-answer-length-effort.md).
+  - D5 fixed templates: [ADR 0013](adr/0013-intro-and-floor-note-templates.md).
+  - D6 closed: how llmgw signs in is llmgw's business.
+  - Dev runs on localhost until M8.
+- **llmgw gap found:** its streams carry no `usage`, `cost_usd` or `req_id`, and it ignores an incoming
+  `X-Request-Id`. homestorm reads those fields if they ever appear and saves a marked estimate meanwhile
+  (ADR 0009). A small llmgw follow-up would close it; llmgw itself is out of scope here.
 - **Repo created and made public:** `autumnfallenwang/homestorm`, with README, plan, this log, ADRs 0001–0008 and the
   two design docs. It's plain Markdown docs only: no devkit scaffold, hooks or project skills. Account-specific details
   (plans, balances, allowance numbers, how llmgw signs in, private links) live in the gitignored `private/notes.md`.
