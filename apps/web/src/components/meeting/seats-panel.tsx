@@ -271,9 +271,9 @@ function RoomRules() {
 }
 
 /**
- * "Context ≈6.4k of 120k · 5%": the seat's last view against its budget (ADR 0015), so the chair sees how close it is
- * to trimming. Our own estimate (characters ÷ 3, the same one trimming uses): llmgw doesn't report usage for streamed
- * answers. Amber from 80%; "Trimming older turns" once its last turn was trimmed. Null until the models have loaded.
+ * "Context 6.4k of 120k · 5%": the seat's last view against its budget (ADR 0015). The count is llmgw's when it
+ * reported one (0.6.0+), else homestorm's estimate (≈). Amber and "Trimming older turns" follow the estimate, because
+ * that's what trimming acts on, and it errs high. Null until the models have loaded.
  */
 function useContextLine(seat: Seat): {
   text: string;
@@ -284,9 +284,8 @@ function useContextLine(seat: Seat): {
   const { state, models, standardContextBudget } = useRoom();
   if (standardContextBudget === null) return null;
   const ctx = seatContext(seat, state, models, standardContextBudget);
-  const windowLine = ctx.window
-    ? `Model window: ${ctx.window.toLocaleString("en-US")} tokens.`
-    : "";
+  const n = (x: number) => x.toLocaleString("en-US");
+  const windowLine = ctx.window ? `Model window: ${n(ctx.window)} tokens.` : "";
   if (ctx.last === null || ctx.percent === null)
     return {
       text: `Context budget ${compactNumber(ctx.budget)}`,
@@ -294,13 +293,18 @@ function useContextLine(seat: Seat): {
       percent: null,
       tone: "ok",
     };
-  const size = `Context ≈${compactNumber(ctx.last)} of ${compactNumber(ctx.budget)} · ${percentLabel(ctx.percent)}`;
+  const shown = ctx.real ?? ctx.last;
+  const size = `Context ${ctx.real === null ? "≈" : ""}${compactNumber(shown)} of ${compactNumber(ctx.budget)} · ${percentLabel(ctx.percent)}`;
   const ofWindow = ctx.window
-    ? ` That's ${percentLabel((ctx.last / ctx.window) * 100)} of the model's ${compactNumber(ctx.window)} window.`
+    ? ` That's ${percentLabel((shown / ctx.window) * 100)} of the model's ${compactNumber(ctx.window)} window.`
     : "";
+  const counted =
+    ctx.real === null
+      ? `Last view ≈${n(ctx.last)} tokens (homestorm's estimate)`
+      : `Last view ${n(ctx.real)} tokens, counted by llmgw (homestorm's estimate, which trimming uses: ≈${n(ctx.last)})`;
   return {
     text: ctx.tone === "trimming" ? `Trimming older turns · ${size}` : size,
-    detail: `Last view ≈${ctx.last.toLocaleString("en-US")} tokens (estimated) of this seat's ${ctx.budget.toLocaleString("en-US")}-token budget.${ofWindow}`,
+    detail: `${counted} of this seat's ${n(ctx.budget)}-token budget.${ofWindow}`,
     percent: ctx.percent,
     tone: ctx.tone,
   };

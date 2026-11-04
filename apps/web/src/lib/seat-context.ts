@@ -16,11 +16,13 @@ export interface SeatContext {
   budget: number;
   /** The model's context window from llmgw, or null when it reports none. */
   window: number | null;
-  /** The last view's size, or null before the seat's first turn. */
+  /** homestorm's estimate of the last view (what trimming uses), or null before the seat's first turn. */
   last: number | null;
-  /** 0–100, or null before the first turn. */
+  /** The prompt tokens llmgw counted for that turn, when it reported them (llmgw 0.6.0+). */
+  real: number | null;
+  /** The shown size against the budget, 0–100: the real count when there is one, else the estimate. */
   percent: number | null;
-  /** ok, near the budget, or its last turn was trimmed. */
+  /** From the estimate, like trimming: ok, near the budget, or its last turn was trimmed. */
   tone: "ok" | "warn" | "trimming";
 }
 
@@ -47,15 +49,17 @@ export function seatContext(
     .at(-1);
   const window = info?.contextWindow ?? null;
   if (!lastTurn || lastTurn.viewTokens === null) {
-    return { budget, window, last: null, percent: null, tone: "ok" };
+    return { budget, window, last: null, real: null, percent: null, tone: "ok" };
   }
   const last = lastTurn.viewTokens;
   const ratio = last / budget;
+  const real = lastTurn.usage && !lastTurn.usage.estimated ? lastTurn.usage.promptTokens : null;
   return {
     budget,
     window,
     last,
-    percent: Math.min(100, ratio * 100),
+    real,
+    percent: Math.min(100, ((real ?? last) / budget) * 100),
     tone: lastTurn.trimmedCount > 0 ? "trimming" : ratio >= CONTEXT_WARN_RATIO ? "warn" : "ok",
   };
 }

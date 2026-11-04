@@ -34,6 +34,7 @@ function model(id: string, ownedBy: Source): ModelInfo {
     ownedBy,
     contextWindow: 1_000_000,
     maxTokens: 128_000,
+    input: id === "deepseek-v4-pro" ? ["text"] : ["text", "image"],
     available: true,
     statusDetail: null,
   };

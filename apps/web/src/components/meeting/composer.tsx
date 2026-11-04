@@ -1,6 +1,6 @@
 "use client";
 
-import { canTakeFloor, type Seat } from "@homestorm/shared";
+import { ATTACHMENT_LIMITS, canTakeFloor, readsImages, type Seat } from "@homestorm/shared";
 import { AtSign, Check, ChevronDown, Loader2, SendHorizontal, Square, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { filesFrom, type PendingFile, readFiles, toAttachmentInputs } from "@/lib/attachments";
 import { allowanceLine, listWords } from "@/lib/format";
 import { seatContext } from "@/lib/seat-context";
 import { cn } from "@/lib/utils";
+import { AttachButton, AttachmentStrip, shownPending } from "./attachments";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
 
@@ -41,6 +43,19 @@ export function Composer() {
   const [query, setQuery] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
   const [sending, setSending] = useState(false);
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  async function addFiles(list: File[]) {
+    if (!list.length) return;
+    const room = ATTACHMENT_LIMITS.perMessage - files.length;
+    const { ok, errors } = await readFiles(list.slice(0, Math.max(0, room)));
+    if (list.length > room)
+      errors.push(`At most ${ATTACHMENT_LIMITS.perMessage} files per message.`);
+    setFiles((f) => [...f, ...ok]);
+    setFileError(errors.join(" ") || null);
+  }
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const seats = state.seats.filter((s) => !s.removedAt);
@@ -69,11 +84,18 @@ export function Composer() {
     .map((m) => seats.find((s) => s.id === m.seatId)?.displayName ?? "A seat");
 
   const comment = mode === "none" && chosen.length === 0;
+  const hasContent = !!text.trim() || files.length > 0;
   const canSend =
     !sending &&
-    (comment
-      ? !!text.trim()
-      : !running && (chosen.length > 0 || (!!text.trim() && active.length > 0)));
+    (comment ? hasContent : !running && (chosen.length > 0 || (hasContent && active.length > 0)));
+  // ADR 0016: a seat that can't read images gets llmgw's text description of them instead.
+  const receivers = chosen.length ? chosen : active;
+  const blindToImages =
+    files.some((f) => f.kind === "image") && !comment
+      ? receivers
+          .filter((s) => !readsImages(s.model, models.get(s.model)))
+          .map((s) => s.displayName)
+      : [];
 
   function onChange(value: string, caret: number) {
     setText(value);
@@ -97,17 +119,25 @@ export function Composer() {
   async function send() {
     if (!canSend) return;
     setSending(true);
+    const attachments = toAttachmentInputs(files);
     const action = comment
-      ? { text, mode: "none" as const, targets: "everyone" as const }
+      ? { text, mode: "none" as const, targets: "everyone" as const, attachments }
       : chosen.length
-        ? { text, mode: mentionMode, targets: chosen.map((s) => s.id) }
-        : { text, mode: mode === "none" ? "blind" : mode, targets: "everyone" as const };
+        ? { text, mode: mentionMode, targets: chosen.map((s) => s.id), attachments }
+        : {
+            text,
+            mode: mode === "none" ? "blind" : mode,
+            targets: "everyone" as const,
+            attachments,
+          };
     const ok = await act(() => api.send(id, action));
     setSending(false);
     if (ok) {
       setText("");
       setMentions([]);
       setQuery(null);
+      setFiles([]);
+      setFileError(null);
     }
   }
 
@@ -203,7 +233,32 @@ export function Composer() {
           </div>
         )}
 
-        <div className="relative rounded-xl border bg-card shadow-xs focus-within:ring-2 focus-within:ring-ring/40">
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: only a drop target; the textarea, the paperclip and the buttons inside are the controls */}
+        <div
+          className={cn(
+            "relative rounded-xl border bg-card shadow-xs focus-within:ring-2 focus-within:ring-ring/40",
+            dragging && "ring-2 ring-brand",
+          )}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+          }}
+          onDrop={(e) => {
+            if (!e.dataTransfer.files.length) return;
+            e.preventDefault();
+            setDragging(false);
+            void addFiles(filesFrom(e.dataTransfer));
+          }}
+        >
+          {dragging && (
+            <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl bg-brand-soft/70 text-sm font-medium text-brand">
+              Drop images or text files
+            </div>
+          )}
           {query !== null && candidates.length > 0 && (
             <div
               id="mention-list"
@@ -266,9 +321,24 @@ export function Composer() {
             </div>
           )}
 
+          {files.length > 0 && (
+            <AttachmentStrip
+              files={shownPending(files)}
+              size="sm"
+              className="px-3 pt-3"
+              onRemove={(key) => setFiles((f) => f.filter((x) => x.key !== key))}
+            />
+          )}
+
           <Textarea
             ref={ref}
             value={text}
+            onPaste={(e) => {
+              const pasted = filesFrom(e.clipboardData);
+              if (!pasted.length) return;
+              e.preventDefault();
+              void addFiles(pasted);
+            }}
             aria-label="Message"
             role="combobox"
             aria-autocomplete="list"
@@ -288,6 +358,7 @@ export function Composer() {
           />
 
           <div className="flex items-center gap-2 px-2 pb-2">
+            <AttachButton onFiles={(f) => void addFiles(f)} disabled={sending} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -348,6 +419,18 @@ export function Composer() {
             </Button>
           </div>
         </div>
+        {fileError && (
+          <p className="mt-1.5 text-center text-[0.6875rem] text-destructive" role="alert">
+            {fileError}
+          </p>
+        )}
+        {blindToImages.length > 0 && (
+          <p className="mt-1.5 text-center text-[0.6875rem] text-warn">
+            {listWords(blindToImages)} can't see images: llmgw gives{" "}
+            {blindToImages.length === 1 ? "it" : "them"} a text description written by another
+            model.
+          </p>
+        )}
         {contextFull && (
           <p className="mt-1.5 text-center text-[0.6875rem] text-warn">
             A seat's context is nearly full: have a seat write minutes and post them, or copy them

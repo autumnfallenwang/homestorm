@@ -136,6 +136,10 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
   profile.
 - **Middle: the meeting.**
   - **Header:** title, status ("Round 2 in progress"), token count and DeepSeek spend, Export, Wrap up ▾.
+  - **Attachments** (added 2026-11-04, [ADR 0016](adr/0016-attachments-images-and-text-files.md)): the message box
+    takes images and text files by paperclip, drag and drop or paste, shown as removable chips. Sent ones show as
+    thumbnails under the chair's bubble; any file opens full size in a viewer (← → between files, Open original). A
+    seat that can't read images is named in a hint under the message box.
   - **Meeting brief** (added 2026-11-04, [ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md)): a card
     pinned above the transcript with the standing context every seat always sees, and Edit. Empty, it's a dashed
     "Add a meeting brief" prompt. Each change shows in the transcript as "You updated the meeting brief · show this

@@ -480,6 +480,119 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(state.meeting.clock).toBe(2);
   });
 
+  const PNG_1X1 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const dotPng = { kind: "image", name: "dot.png", mime: "image/png", data: PNG_1X1 };
+
+  it("takes images and text files on a message, serves them, and shows them to the seats", async () => {
+    const { call, engine, llm } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "Files" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "claude-opus-5-5" });
+    const sent = await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Look",
+      mode: "blind",
+      targets: "everyone",
+      attachments: [
+        dotPng,
+        { kind: "text", name: "notes.md", text: "# Notes\nCache at the edge." },
+      ],
+    });
+    expect(sent.status).toBe(202);
+    await engine.waitIdle(id);
+
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    const files = state.messages.find((m) => m.authorKind === "chair")!.attachments;
+    expect(files.map((f) => [f.kind, f.name, f.mime, f.width, f.textChars])).toEqual([
+      ["image", "dot.png", "image/png", 1, null],
+      ["text", "notes.md", "text/plain", null, 26],
+    ]);
+
+    const img = await setup().app.request(`/api/meetings/${id}/attachments/${files[0]!.id}`);
+    expect(img.status).toBe(200);
+    expect(img.headers.get("content-type")).toBe("image/png");
+    expect(img.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(Buffer.from(await img.arrayBuffer()).equals(Buffer.from(PNG_1X1, "base64"))).toBe(true);
+    const txt = await call("GET", `/api/meetings/${id}/attachments/${files[1]!.id}`);
+    expect(txt.text).toBe("# Notes\nCache at the edge.");
+
+    const seen = JSON.stringify(llm.callsFor("claude-opus-5-5")[0]!.messages);
+    expect(seen).toContain("data:image/png;base64,");
+    expect(seen).toContain('<file name=\\"notes.md\\">');
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("- Image: dot.png (1×1)");
+    expect(md).toContain(
+      "- File: notes.md (26 characters)\n\n```text\n# Notes\nCache at the edge.\n```",
+    );
+  });
+
+  it("refuses files it can't take", async () => {
+    const { call } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "Bad files" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "claude-opus-5-5" });
+    const send = (attachments: unknown[]) =>
+      call("POST", `/api/meetings/${id}/actions`, {
+        text: "Q",
+        mode: "blind",
+        targets: "everyone",
+        attachments,
+      });
+    const svg = await send([
+      { kind: "image", name: "x.svg", mime: "image/svg+xml", data: "PHN2Zy8+" },
+    ]);
+    expect(svg.status).toBe(400);
+    const fake = await send([{ ...dotPng, data: Buffer.from("not an image").toString("base64") }]);
+    expect(fake.status).toBe(400);
+    expect(fake.body.error).toBe("dot.png isn't a readable image.");
+    expect((await send(Array.from({ length: 9 }, () => dotPng))).status).toBe(400);
+    expect((await send([{ kind: "text", name: "a.bin", text: "a\u0000b" }])).body.error).toBe(
+      "a.bin isn't a text file.",
+    );
+  });
+
+  it("keeps the brief's files across edits, puts them in every view, and caps them", async () => {
+    const { call, engine, llm } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "Brief files" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" });
+    const first = await call("PUT", `/api/meetings/${id}/brief`, {
+      content: "Facts",
+      attachments: [dotPng, { kind: "text", name: "spec.txt", text: "Spec v1" }],
+    });
+    expect(first.body.message.attachments).toHaveLength(2);
+    // A text-only edit keeps the files, copied onto the new version.
+    const second = await call("PUT", `/api/meetings/${id}/brief`, { content: "Facts v2" });
+    expect(second.body.message.attachments.map((f: { name: string }) => f.name)).toEqual([
+      "dot.png",
+      "spec.txt",
+    ]);
+    expect(second.body.message.attachments[0].id).not.toBe(first.body.message.attachments[0].id);
+
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Q",
+      mode: "blind",
+      targets: "everyone",
+    });
+    await engine.waitIdle(id);
+    const turn = llm.callsFor("gpt-6-luna")[0]!;
+    expect(turn.messages[0]?.content).toContain(
+      'Facts v2\n\n<file name="spec.txt">\nSpec v1\n</file>',
+    );
+    expect(JSON.stringify(turn.messages[1]?.content)).toContain(
+      "(The image above is from the meeting brief: dot.png.)",
+    );
+
+    const removed = await call("PUT", `/api/meetings/${id}/brief`, {
+      content: "Facts v2",
+      keepAttachmentIds: [],
+    });
+    expect(removed.body).toMatchObject({ changed: true, message: { attachments: [] } });
+    const tooMany = await call("PUT", `/api/meetings/${id}/brief`, {
+      content: "Facts v2",
+      attachments: Array.from({ length: 5 }, () => dotPng),
+    });
+    expect(tooMany.status).toBe(400);
+  });
+
   it("deletes a meeting", async () => {
     const { call } = setup();
     const id = (await call("POST", "/api/meetings", { title: "T" })).body.id as string;

@@ -141,6 +141,29 @@ export const BRIEF_UPDATED_NOTE =
   "(The Chair updated the meeting brief. Your instructions have the current version.)";
 export const BRIEF_CLEARED_NOTE = "(The Chair cleared the meeting brief.)";
 
+/**
+ * Follows the brief's images, which open the conversation (ADR 0016). Names say which image is which, also for a
+ * text-only seat, which gets llmgw's description of each message's images instead.
+ */
+export function briefImagesNote(names: string[]): string {
+  return names.length === 1
+    ? `(The image above is from the meeting brief: ${names[0]}.)`
+    : `(The images above are from the meeting brief, in order: ${names.join(", ")}.)`;
+}
+
+/**
+ * Names a message's images, right after them (ADR 0016). After, not before: llmgw puts a text-only seat's
+ * "[Image description: …]" at the start of the message, so "above" reads right for every seat.
+ */
+export function imagesNote(names: string[]): string {
+  return names.length === 1
+    ? `(The image above: ${names[0]}.)`
+    : `(The images above, in order: ${names.join(", ")}.)`;
+}
+
+/** A chair message with files and no text of its own (ADR 0016). */
+export const ATTACHMENTS_ONLY = "(See the attached files.)";
+
 /** Ends an answer the chair stopped and then kept, so no seat takes the cut-off text for a finished answer. */
 export const CUT_OFF_NOTE = "(The Chair stopped this answer here.)";
 

@@ -2,6 +2,7 @@
 
 import type {
   AddSeatInput,
+  AttachmentInput,
   Limits,
   Meeting,
   MeetingState,
@@ -67,10 +68,17 @@ export const api = {
   listMeetings: () => request<MeetingSummary[]>("GET", "/api/meetings"),
   createMeeting: (title: string, brief?: string) =>
     request<Meeting>("POST", "/api/meetings", { title, ...(brief?.trim() ? { brief } : {}) }),
-  setBrief: (id: string, content: string) =>
+  setBrief: (
+    id: string,
+    content: string,
+    files: { keepAttachmentIds?: string[]; attachments?: AttachmentInput[] } = {},
+  ) =>
     request<{ changed: boolean; message: Message | null }>("PUT", `/api/meetings/${id}/brief`, {
       content,
+      ...files,
     }),
+  attachmentUrl: (meetingId: string, attachmentId: string) =>
+    `${apiBaseUrl()}/api/meetings/${meetingId}/attachments/${attachmentId}`,
   getMeeting: (id: string) => request<MeetingState>("GET", `/api/meetings/${id}`),
   updateMeeting: (id: string, patch: UpdateMeetingInput) =>
     request<Meeting>("PATCH", `/api/meetings/${id}`, patch),

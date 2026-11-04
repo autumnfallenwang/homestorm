@@ -1,6 +1,7 @@
 // A meeting as Markdown (v1 scope, ADR 0009): seats, then the transcript in order, rounds as headings.
 
 import {
+  type AttachmentMeta,
   briefAt,
   type MeetingState,
   type Message,
@@ -22,7 +23,15 @@ const WRAP_LABEL = {
   open_questions: "Open questions",
 } as const;
 
-export function exportMarkdown(state: MeetingState, now = new Date()): string {
+/**
+ * `texts` holds text files' contents by attachment id, so the export carries them whole. Images are listed by name
+ * and size: the file stays readable without them, and they're one click away in the app.
+ */
+export function exportMarkdown(
+  state: MeetingState,
+  now = new Date(),
+  texts: Map<string, string> = new Map(),
+): string {
   const { meeting, seats, rounds, messages } = state;
   const seatById = new Map(seats.map((s) => [s.id, s]));
   const roundById = new Map(rounds.map((r) => [r.id, r]));
@@ -60,7 +69,16 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
   ];
   const brief = briefAt(messages, meeting.clock);
   const firstBriefId = messages.find((m) => m.authorKind === "brief")?.id;
-  if (brief) out.push("## Meeting brief", "", brief, "");
+  const currentBrief = messages
+    .filter((m) => m.authorKind === "brief" && m.visibleSeq !== null)
+    .sort((a, b) => (a.visibleSeq ?? 0) - (b.visibleSeq ?? 0))
+    .at(-1);
+  const files = (m: Message) => attachmentLines(m.attachments, texts);
+  if (brief || currentBrief?.attachments.length) {
+    out.push("## Meeting brief", "");
+    if (brief) out.push(brief, "");
+    if (currentBrief) out.push(...files(currentBrief));
+  }
   out.push("## Transcript", "");
 
   const headed = new Set<string>();
@@ -82,12 +100,17 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
     }
     if (m.authorKind === "brief") {
       const verb = m.id === firstBriefId ? "set" : "updated";
-      out.push(
-        m.content
-          ? `_You ${verb} the meeting brief:_\n\n${quote(m.content)}`
-          : "_You cleared the meeting brief_",
-        "",
-      );
+      if (!m.content && !m.attachments.length) {
+        out.push("_You cleared the meeting brief_", "");
+        continue;
+      }
+      out.push(`_You ${verb} the meeting brief:_`, "");
+      if (m.content) out.push(quote(m.content), "");
+      if (m.attachments.length)
+        out.push(
+          ...m.attachments.map((a) => `> ${a.kind === "image" ? "Image" : "File"}: ${a.name}`),
+          "",
+        );
       continue;
     }
     const promptOf = roundByPrompt.get(m.id);
@@ -105,6 +128,7 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
             : `to everyone · ${m.sendMode === "in_turn" ? "in turn" : "blind"}`;
       out.push(`**Chair** · ${target ? `${where} · replying to ${name(target)}` : where}`, "");
       if (m.content) out.push(quote(m.content), "");
+      out.push(...files(m));
       continue;
     }
 
@@ -142,4 +166,24 @@ function oneLine(text: string, max = 120): string {
   const flat = text.replace(/\s+/g, " ").trim();
   const cut = flat.length > max ? `${flat.slice(0, max).trimEnd()}…` : flat;
   return cut.replace(/\|/g, "\\|");
+}
+
+/** "- Image: photo.png (1280×720)", and each text file in full in a fenced block. */
+function attachmentLines(files: AttachmentMeta[], texts: Map<string, string>): string[] {
+  if (!files.length) return [];
+  const out: string[] = [];
+  for (const f of files) {
+    if (f.kind === "image") {
+      out.push(`- Image: ${f.name}${f.width && f.height ? ` (${f.width}×${f.height})` : ""}`);
+      continue;
+    }
+    out.push(`- File: ${f.name} (${(f.textChars ?? 0).toLocaleString("en-US")} characters)`);
+    const text = texts.get(f.id);
+    if (text !== undefined) {
+      const fence = text.includes("```") ? "~~~~" : "```";
+      out.push("", `${fence}text`, text, fence, "");
+    }
+  }
+  out.push("");
+  return out;
 }

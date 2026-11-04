@@ -50,3 +50,14 @@ it as "≈ N tokens". Cost is shown only when llmgw reports it.
 
 - Loki tracing from a homestorm message to llmgw's log line is by model and time until llmgw returns its `req_id`.
 - The DeepSeek spend in the meeting header is shown only for messages whose cost llmgw reported.
+
+## Update, 2026-11-04: llmgw 0.6.0 returns usage on streams
+
+- With `stream_options.include_usage`, a stream now ends with a chunk carrying `usage` (OpenAI's shape). homestorm
+  already read it, so messages save real token counts (`estimated: false`) with no code change.
+- **Claude's prompt count:** llmgw 0.6.0 reports only the uncached part as `prompt_tokens` (4 of a 7,233-token
+  prompt read from cache), while `total_tokens` counts all of it. homestorm takes the prompt as the larger of
+  `prompt_tokens` and `total − completion` (`readUsage` in `apps/api/src/services/llmgw.ts`).
+- **Still missing on streams:** `cost_usd` and llmgw's `req_id`. Tracing to llmgw's log line stays by model and time.
+- **The context meter** shows llmgw's count when it has one. Trimming keeps using homestorm's own estimate, which is
+  known before the call and errs high (it was 1,630 for a view llmgw counted at 941).

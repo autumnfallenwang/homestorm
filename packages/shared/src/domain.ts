@@ -2,6 +2,7 @@
 // Design: docs/meeting-control-design.md; data model: docs/data-model.md.
 
 import { z } from "zod";
+import { ATTACHMENT_LIMITS, AttachmentInput, type AttachmentMeta } from "./attachments.js";
 
 /** llmgw's `owned_by` values homestorm seats can use (ADR 0002). Ollama is left out on purpose. */
 export const SOURCES = ["anthropic", "openai-codex", "deepseek"] as const;
@@ -170,6 +171,8 @@ export interface Message {
   trimmedCount: number;
   /** The view's size by the budget estimate when the turn started, for the seat card's context bar. */
   viewTokens: number | null;
+  /** Images and text files on a chair message or a brief version (ADR 0016). */
+  attachments: AttachmentMeta[];
   /** A stopped answer whose partial text the chair kept. */
   stoppedEarly: boolean;
   createdAt: string;
@@ -216,9 +219,15 @@ export const UpdateMeetingInput = z
   .partial();
 export type UpdateMeetingInput = z.infer<typeof UpdateMeetingInput>;
 
-/** Set, change or clear (empty) the meeting brief. */
-export const SetBriefInput = z.object({ content: z.string().max(BRIEF_MAX_CHARS) });
-export type SetBriefInput = z.infer<typeof SetBriefInput>;
+/** Set, change or clear (empty) the meeting brief, with its images and text files (ADR 0016). */
+export const SetBriefInput = z.object({
+  content: z.string().max(BRIEF_MAX_CHARS),
+  /** The current brief's attachments to carry over. Omitted: keep them all (a text-only edit). */
+  keepAttachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_LIMITS.perMessage).optional(),
+  /** New ones to add. */
+  attachments: z.array(AttachmentInput).max(ATTACHMENT_LIMITS.perMessage).default([]),
+});
+export type SetBriefInput = z.input<typeof SetBriefInput>;
 
 /** The brief seats get at a clock value: the latest version at or before it ("" when none or cleared). */
 export function briefAt(
@@ -290,8 +299,11 @@ export const SendActionInput = z
     mode: z.enum(SEND_MODES),
     targets: z.union([z.literal("everyone"), z.array(z.string().uuid()).min(1).max(20)]),
     replyTo: z.string().uuid().nullable().default(null),
+    /** Images and text files (ADR 0016). They count as content, so a message may be files alone. */
+    attachments: z.array(AttachmentInput).max(ATTACHMENT_LIMITS.perMessage).default([]),
   })
   .superRefine((v, ctx) => {
+    if (v.attachments.length) return;
     if (v.mode === "none" && v.text.trim() === "") {
       ctx.addIssue({ code: "custom", path: ["text"], message: "A comment needs text" });
     }
@@ -346,6 +358,8 @@ export interface ModelInfo {
   ownedBy: Source;
   contextWindow: number | null;
   maxTokens: number | null;
+  /** What the model reads, from llmgw 0.6.0's /v1/models; null from an older llmgw (ADR 0016). */
+  input: ("text" | "image")[] | null;
   /** False when llmgw's validation failed, e.g. "not supported" on the current plan. */
   available: boolean;
   statusDetail: string | null;

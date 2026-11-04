@@ -6,6 +6,42 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-04
 
+- **llmgw 0.6.0 picked up** (it fixed what homestorm had reported).
+  - **Image support:** the image hint reads `/v1/models` `input` instead of homestorm's own list.
+  - **Real token counts:** streamed answers now carry usage, so messages save real counts. The context meter shows
+    llmgw's count ("Context 941 of 120k", without ≈) and keeps the estimate in its tooltip; amber and trimming still
+    follow the estimate.
+  - **A Claude workaround:** llmgw reports only Claude's uncached prompt as `prompt_tokens`, so homestorm uses
+    `total − completion` when that's larger. Found by checking a cached 7.2k prompt (reported as 4).
+  - **Checked:** 124 tests; in the browser, the V4 Pro card showed llmgw's 941 against our ≈1,630 estimate.
+  - **Seen on the way:** llmgw reports Claude `exhausted` with 10% of the week left (resets 2026-11-06), so Claude
+    seats are refused until then.
+- **Attachments, phase 1** ([ADR 0016](adr/0016-attachments-images-and-text-files.md)). Images and text files on
+  the chair's messages and in the meeting brief.
+  - **llmgw checked first:**
+    - images work for Claude, GPT and DeepSeek Flash, streamed or not, several per message;
+    - DeepSeek V4 Pro gets llmgw's text description instead;
+    - a `file` part is refused, so text files are inlined by homestorm.
+  - **Built:**
+    - paperclip, drag and drop and paste, with browser-side resizing (a 4000×2250 photo became 2048×1152 WebP);
+    - server checks with `image-size`;
+    - an `attachments` table (migration `0005_attachments`);
+    - image parts and inline `<file>` blocks in views, the brief's images pinned at the top, image tokens in budgets;
+    - thumbnails, a full-size viewer, the export, and a hint naming seats that can't see images.
+  - **Found and fixed while testing:**
+    - **V4 Pro mixed up images from different messages.** llmgw's fallback writes one description per user message,
+      at its start, and homestorm had merged the brief's images with a question's. Now each image-carrying message
+      stands alone, with its names in a label after the images; V4 Pro then answered right.
+    - **Stop all could miss a turn still setting up** (no abort controller yet). The turn now checks for a stop as
+      soon as it registers. A test that waits on this had started timing out.
+  - **Checked:**
+    - 123 tests;
+    - in the browser on localhost, with Claude Haiku, GPT-5.6 Luna and DeepSeek V4 Pro:
+      - every seat read both images and the code word from a text file;
+      - all three read the brief's image and spec;
+      - the viewer, the brief editor and the export worked.
+  - **For llmgw** (listed in ADR 0016): describe images one by one in place, separate a message's text parts, cache
+    descriptions, and say which models take images.
 - **Meeting brief and a new full-context policy** ([ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md)).
   - **The brief:** standing context the chair writes (optional in New meeting, editable from a card pinned at the
     top). Every seat gets it in its intro after the title, and it's never trimmed. It follows the meeting clock

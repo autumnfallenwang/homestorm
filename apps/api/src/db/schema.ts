@@ -9,6 +9,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   doublePrecision,
   index,
   integer,
@@ -206,5 +207,41 @@ export const messages = pgTable(
       sql`${t.status} IN ('queued', 'streaming', 'done', 'stopped', 'error', 'skipped')`,
     ),
     check("messages_seat_has_seat", sql`${t.authorKind} <> 'seat' OR ${t.seatId} IS NOT NULL`),
+  ],
+);
+
+/** Raw bytes (Postgres `bytea`), as a Node Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * Images and text files on a chair message or a brief version (ADR 0016). Never changed once saved: a new brief
+ * version copies the rows it keeps, so every version stays whole.
+ */
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    meetingId: uuid()
+      .notNull()
+      .references(() => meetings.id, { onDelete: "cascade" }),
+    messageId: uuid()
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    position: integer().notNull(),
+    kind: text().notNull(),
+    name: text().notNull(),
+    mime: text().notNull(),
+    sizeBytes: integer().notNull(),
+    width: integer(),
+    height: integer(),
+    textChars: integer(),
+    // Image bytes, or a text file as UTF-8.
+    data: bytea().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("attachments_message_idx").on(t.messageId, t.position),
+    index("attachments_meeting_idx").on(t.meetingId),
+    check("attachments_kind_valid", sql`${t.kind} IN ('image', 'text')`),
   ],
 );

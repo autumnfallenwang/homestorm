@@ -35,6 +35,9 @@ importers:
       hono-rate-limiter:
         specifier: 0.5.3
         version: 0.5.3(hono@4.13.16)
+      image-size:
+        specifier: 2.0.4
+        version: 2.0.4
       openai:
         specifier: ^7.47.0
         version: 7.47.0(zod@3.25.76)
@@ -2508,6 +2511,11 @@ packages:
 
   html-url-attributes@3.0.1:
     resolution: {integrity: sha512-ol6UPyBWqsrO6EJySPz2O7ZSr856WDrEzM5zMqp+FJJLGMW35cLYmmZnl0vztAZxRUoNZJFTCohfjuIJ8I4QBQ==}
+
+  image-size@2.0.4:
+    resolution: {integrity: sha512-QRUkFFsRV/6fuESxb9Vkq+a0LkSrgKXuc2NEqfikiXxxN/G3tjWt5EVUlMaImRBZRZK/jRBEbYvpPYZL8t08Zw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   inline-style-parser@0.2.9:
     resolution: {integrity: sha512-IttN8BqKLxzUrnTqHI+/hwAJQItBAUjdoHERCDv+oOuX48VP6bzW8+QjOXSfoevzq3YrYAwX1uLHp8TqO9yIeg==}
@@ -5072,6 +5080,8 @@ snapshots:
   hono@4.13.16: {}
 
   html-url-attributes@3.0.1: {}
+
+  image-size@2.0.4: {}
 
   inline-style-parser@0.2.9: {}
 

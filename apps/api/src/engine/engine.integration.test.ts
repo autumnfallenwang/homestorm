@@ -3,6 +3,7 @@
 import type { Meeting, MeetingEvent, Seat } from "@homestorm/shared";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, db } from "../db/index.js";
+import type { ChatTurn } from "../services/llmgw.js";
 import { createStore } from "../services/store.js";
 import { hasTestDb, truncateAll } from "../test/db.js";
 import { FakeLlm, LlmError } from "../test/fake-llm.js";
@@ -44,10 +45,15 @@ async function world(): Promise<World> {
   return { engine, llm, hub, meeting, claude, gpt, ds, events };
 }
 
-const userText = (turn: { messages: { role: string; content: string }[] }) =>
+/** Everything a seat was shown after its system prompt, images as "[image]". */
+const userText = (turn: ChatTurn) =>
   turn.messages
     .filter((m) => m.role !== "system")
-    .map((m) => m.content)
+    .map((m) =>
+      typeof m.content === "string"
+        ? m.content
+        : m.content.map((p) => (p.type === "text" ? p.text : "[image]")).join("\n"),
+    )
     .join("\n");
 
 async function seatMessages(meetingId: string) {

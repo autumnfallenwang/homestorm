@@ -29,6 +29,9 @@
 - **What it is:** standing context for the whole meeting, written by the chair: background, facts, constraints,
   the goal. It's optional, and it can be set when the meeting is created and changed at any time.
 - **Size:** at most 12,000 characters (about 4,000 tokens), so it fits even a Small context budget.
+- **Files** (added 2026-11-04, [ADR 0016](0016-attachments-images-and-text-files.md)): up to 4 images and 24,000
+  characters of text files. Text files go in the intro with the brief; images open the conversation, pinned, since
+  Claude takes no images in the system prompt.
 - **Where seats see it:** in every seat's intro, after the title and before the persona, as "Meeting brief from
   the Chair". **It is never trimmed.**
 - **It follows the meeting clock.** Each save is a new version stored as a message (`author_kind = 'brief'`) with

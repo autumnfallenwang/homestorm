@@ -3,6 +3,7 @@
 
 import type {
   AnswerLength,
+  AttachmentMeta,
   AuthorKind,
   ContextBudget,
   Meeting,
@@ -21,12 +22,45 @@ import type {
 } from "@homestorm/shared";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "../db/index.js";
-import { meetings, messages, rounds, seats } from "../db/schema.js";
+import { attachments, meetings, messages, rounds, seats } from "../db/schema.js";
 
 type MeetingRow = typeof meetings.$inferSelect;
 type SeatRow = typeof seats.$inferSelect;
 type RoundRow = typeof rounds.$inferSelect;
 type MessageRow = typeof messages.$inferSelect;
+type AttachmentRow = typeof attachments.$inferSelect;
+export type AttachmentInsert = Omit<typeof attachments.$inferInsert, "id" | "createdAt">;
+/** An attachment with its bytes, for building views and serving the file. */
+export type AttachmentWithData = AttachmentMeta & { messageId: string; data: Buffer };
+
+export function toAttachmentMeta(r: Omit<AttachmentRow, "data">): AttachmentMeta {
+  return {
+    id: r.id,
+    kind: r.kind as AttachmentMeta["kind"],
+    name: r.name,
+    mime: r.mime,
+    sizeBytes: r.sizeBytes,
+    width: r.width,
+    height: r.height,
+    textChars: r.textChars,
+  };
+}
+
+/** Every column but the bytes. */
+const attachmentMetaColumns = {
+  id: attachments.id,
+  meetingId: attachments.meetingId,
+  messageId: attachments.messageId,
+  position: attachments.position,
+  kind: attachments.kind,
+  name: attachments.name,
+  mime: attachments.mime,
+  sizeBytes: attachments.sizeBytes,
+  width: attachments.width,
+  height: attachments.height,
+  textChars: attachments.textChars,
+  createdAt: attachments.createdAt,
+};
 export type MessageInsert = Omit<typeof messages.$inferInsert, "id" | "seq">;
 export type MessagePatch = Partial<Omit<typeof messages.$inferInsert, "id" | "seq" | "meetingId">>;
 
@@ -77,8 +111,9 @@ export function toRound(r: RoundRow): Round {
   };
 }
 
-export function toMessage(r: MessageRow): Message {
+export function toMessage(r: MessageRow, files: AttachmentMeta[] = []): Message {
   return {
+    attachments: files,
     id: r.id,
     meetingId: r.meetingId,
     seq: r.seq,
@@ -184,7 +219,7 @@ export function createStore(db: Database) {
     async getState(meetingId: string): Promise<MeetingState | null> {
       const meeting = await this.getMeeting(meetingId);
       if (!meeting) return null;
-      const [seatRows, roundRows, messageRows] = await Promise.all([
+      const [seatRows, roundRows, messageRows, fileRows] = await Promise.all([
         db.select().from(seats).where(eq(seats.meetingId, meetingId)).orderBy(asc(seats.position)),
         db.select().from(rounds).where(eq(rounds.meetingId, meetingId)).orderBy(asc(rounds.number)),
         db
@@ -192,12 +227,23 @@ export function createStore(db: Database) {
           .from(messages)
           .where(eq(messages.meetingId, meetingId))
           .orderBy(asc(messages.seq)),
+        db
+          .select(attachmentMetaColumns)
+          .from(attachments)
+          .where(eq(attachments.meetingId, meetingId))
+          .orderBy(asc(attachments.position)),
       ]);
+      const filesByMessage = new Map<string, AttachmentMeta[]>();
+      for (const f of fileRows) {
+        const list = filesByMessage.get(f.messageId) ?? [];
+        list.push(toAttachmentMeta(f));
+        filesByMessage.set(f.messageId, list);
+      }
       return {
         meeting,
         seats: seatRows.map(toSeat),
         rounds: roundRows.map(toRound),
-        messages: messageRows.map(toMessage),
+        messages: messageRows.map((m) => toMessage(m, filesByMessage.get(m.id) ?? [])),
       };
     },
 
@@ -304,6 +350,31 @@ export function createStore(db: Database) {
     },
 
     // ── Messages ──────────────────────────────────────────────────────────
+    // ── Attachments (ADR 0016) ────────────────────────────────────────────
+    async insertAttachments(rows: AttachmentInsert[]): Promise<AttachmentMeta[]> {
+      if (!rows.length) return [];
+      const inserted = await db.insert(attachments).values(rows).returning(attachmentMetaColumns);
+      return inserted.sort((a, b) => a.position - b.position).map(toAttachmentMeta);
+    },
+
+    /** With the bytes: for building views (the engine caches them; they never change). */
+    async attachmentsWithData(meetingId: string, ids: string[]): Promise<AttachmentWithData[]> {
+      if (!ids.length) return [];
+      const rows = await db
+        .select()
+        .from(attachments)
+        .where(and(eq(attachments.meetingId, meetingId), inArray(attachments.id, ids)));
+      return rows.map((r) => ({ ...toAttachmentMeta(r), messageId: r.messageId, data: r.data }));
+    },
+
+    async getAttachment(meetingId: string, id: string): Promise<AttachmentWithData | null> {
+      const [row] = await db
+        .select()
+        .from(attachments)
+        .where(and(eq(attachments.meetingId, meetingId), eq(attachments.id, id)));
+      return row ? { ...toAttachmentMeta(row), messageId: row.messageId, data: row.data } : null;
+    },
+
     async insertMessage(values: MessageInsert): Promise<Message> {
       const [row] = await db.insert(messages).values(values).returning();
       return toMessage(row as MessageRow);
@@ -332,7 +403,7 @@ export function createStore(db: Database) {
         .from(messages)
         .where(eq(messages.roundId, roundId))
         .orderBy(asc(messages.seq));
-      return rows.map(toMessage);
+      return rows.map((r) => toMessage(r));
     },
 
     /**
@@ -369,7 +440,7 @@ export function createStore(db: Database) {
     async messagesByIds(ids: string[]): Promise<Message[]> {
       if (!ids.length) return [];
       const rows = await db.select().from(messages).where(inArray(messages.id, ids));
-      return rows.map(toMessage);
+      return rows.map((r) => toMessage(r));
     },
   };
 }

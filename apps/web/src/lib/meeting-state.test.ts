@@ -40,6 +40,7 @@ const msg = (extra: Partial<Message>): Message => ({
   requestId: null,
   trimmedCount: 0,
   viewTokens: null,
+  attachments: [],
   stoppedEarly: false,
   createdAt: "2026-11-02T00:00:00.000Z",
   startedAt: null,
@@ -300,6 +301,7 @@ describe("seatContext", () => {
         ownedBy: "anthropic" as const,
         contextWindow: 1_000_000,
         maxTokens: 128_000,
+        input: ["text", "image"] as ("text" | "image")[],
         available: true,
         statusDetail: null,
       },
@@ -327,6 +329,18 @@ describe("seatContext", () => {
     const small = { ...seat, contextBudget: "small" as const };
     expect(seatContext(small, state([turn(27_000)]), models, 120_000)).toMatchObject({
       budget: 32_000,
+      tone: "warn",
+    });
+    // llmgw's count is shown when it gave one; the tone still follows the estimate.
+    const counted = msg({
+      seatId: "s1",
+      authorKind: "seat",
+      viewTokens: 100_000,
+      usage: { promptTokens: 73_000, completionTokens: 10, totalTokens: 73_010, estimated: false },
+    });
+    expect(seatContext(seat, state([counted]), models, 120_000)).toMatchObject({
+      real: 73_000,
+      last: 100_000,
       tone: "warn",
     });
   });

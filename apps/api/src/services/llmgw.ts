@@ -10,9 +10,14 @@ import { SOURCES } from "@homestorm/shared";
 import OpenAI, { APIError } from "openai";
 import { log } from "../lib/logger.js";
 
+/** OpenAI-style content parts; images go as `image_url` data URLs (ADR 0016). */
+export type ChatTurnPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatTurn {
   model: string;
-  messages: { role: "system" | "user" | "assistant"; content: string }[];
+  messages: { role: "system" | "user" | "assistant"; content: string | ChatTurnPart[] }[];
   maxTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
   /** homestorm's id for this call, sent as X-Request-Id. */
@@ -87,7 +92,8 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
           .create(
             {
               model: turn.model,
-              messages: turn.messages,
+              // Only user turns carry image parts (the view puts images there); the SDK's types split roles finer.
+              messages: turn.messages as OpenAI.Chat.ChatCompletionMessageParam[],
               stream: true,
               stream_options: { include_usage: true },
               ...(turn.maxTokens ? { max_tokens: turn.maxTokens } : {}),
@@ -135,6 +141,9 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
             ownedBy: m.owned_by as Source,
             contextWindow: m.context_window ?? null,
             maxTokens: m.max_tokens ?? null,
+            input: Array.isArray(m.input)
+              ? m.input.filter((x) => x === "text" || x === "image")
+              : null,
             available: m.status !== "error",
             statusDetail: m.status_detail ?? null,
           }),
@@ -169,7 +178,7 @@ interface RawChunk {
   req_id?: string;
 }
 
-interface RawUsage {
+export interface RawUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
@@ -184,15 +193,23 @@ interface RawModel {
   capability?: string;
   context_window?: number;
   max_tokens?: number;
+  /** llmgw 0.6.0+: ["text"] or ["text", "image"]. */
+  input?: string[];
   status?: string;
   status_detail?: string | null;
 }
 
-function readUsage(u: RawUsage): Extract<StreamEvent, { type: "done" }>["usage"] {
+/**
+ * llmgw's usage, in homestorm's shape. The prompt is the larger of `prompt_tokens` and `total − completion`: for
+ * Claude, llmgw 0.6.0 reports only the uncached part as `prompt_tokens` (4 of a 7,233-token prompt), while the total
+ * counts all of it.
+ */
+export function readUsage(u: RawUsage): Extract<StreamEvent, { type: "done" }>["usage"] {
   if (typeof u.prompt_tokens !== "number" || typeof u.completion_tokens !== "number") return null;
   const cache = u.cache_read_tokens ?? u.prompt_tokens_details?.cached_tokens;
+  const fromTotal = typeof u.total_tokens === "number" ? u.total_tokens - u.completion_tokens : 0;
   return {
-    promptTokens: u.prompt_tokens,
+    promptTokens: Math.max(u.prompt_tokens, fromTotal),
     completionTokens: u.completion_tokens,
     totalTokens: u.total_tokens ?? u.prompt_tokens + u.completion_tokens,
     ...(typeof cache === "number" ? { cacheReadTokens: cache } : {}),

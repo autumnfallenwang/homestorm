@@ -92,3 +92,4 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0013](docs/adr/0013-intro-and-floor-note-templates.md) | Intro and floor-note templates fixed in code |
 | [0014](docs/adr/0014-tools-through-mcpgw.md) | Tools (web search first) come from mcpgw, the tool gateway; homestorm runs the tool loop. Not built yet |
 | [0015](docs/adr/0015-meeting-brief-and-full-context-policy.md) | A meeting brief every seat always sees; when a view is full, keep the start, the latest posted wrap-up and the newest turns |
+| [0016](docs/adr/0016-attachments-images-and-text-files.md) | Images and text files on messages and the brief: thumbnails, a full-size viewer, inline text files, image tokens in budgets |

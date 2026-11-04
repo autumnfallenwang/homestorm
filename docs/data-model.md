@@ -13,6 +13,7 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 | `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `removed_at` |
 | `rounds` | time the chair gives the floor | `number`, `mode` (blind / in_turn / single / wrap_up), `seat_ids` in answering order, `prompt_message_id`, `reply_to_id`, `wrap_kind`, `status` |
 | `messages` | transcript entry | `author_kind` (chair / seat / event / brief), `seat_id`, `round_id`, `content`, `status`, `visible_seq`, `cutoff_seq`, tracing fields |
+| `attachments` | image or text file on a chair message or a brief version | `message_id`, `position`, `kind` (image / text), `name`, `mime`, `size_bytes`, `width`, `height`, `text_chars`, `data` (bytea) ([ADR 0016](adr/0016-attachments-images-and-text-files.md)) |
 | `users`, `sessions`, `accounts`, `verifications` | Better Auth | the one admin login ([ADR 0011](adr/0011-one-admin-login.md)) |
 
 - **Removed seats are kept** (`removed_at`), so their earlier messages still have a name in every view. They leave
@@ -25,6 +26,8 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
   version with `visible_seq <= cutoff_seq` (`briefAt` in `packages/shared`), so blind rounds share one version and
   Retry repeats it. A version saved after the discussion started leaves a one-line note at its place in later views.
   At most 12,000 characters.
+- **Attachments never change once saved.** A new brief version copies the files it keeps, so each version is whole
+  and Retry rebuilds the same view. Deleting a meeting deletes its files.
 - **Event lines** ("You muted Claude Sonnet 5.5 for rounds") are messages with `author_kind = 'event'`. Seats never
   see them. Room-rule changes ("You set answers to Detailed") and posting a wrap-up ("You posted Scribe's decision")
   add one too, so the transcript and the export show when they happened.

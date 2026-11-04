@@ -18,16 +18,20 @@
 import {
   type AnswerLength,
   briefAt,
+  imageTokens,
   type Message,
   type Seat,
   seatAnswerLength,
   type WrapKind,
 } from "@homestorm/shared";
 import {
+  ATTACHMENTS_ONLY,
   BRIEF_CLEARED_NOTE,
   BRIEF_UPDATED_NOTE,
+  briefImagesNote,
   CUT_OFF_NOTE,
   type Floor,
+  imagesNote,
   MEETING_STARTED,
   type RosterEntry,
   renderFloorNote,
@@ -36,9 +40,25 @@ import {
 } from "./prompts.js";
 import { budgetTokens, MESSAGE_OVERHEAD_TOKENS } from "./tokens.js";
 
+/** OpenAI-style content parts, as llmgw takes them (ADR 0016). */
+export type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  /** Plain text, or parts when the message carries images. */
+  content: string | ChatPart[];
+}
+
+/** An attachment as a view needs it: an image as a data URL, a text file as its text. */
+export interface ViewAttachment {
+  kind: "image" | "text";
+  name: string;
+  width: number | null;
+  height: number | null;
+  url?: string;
+  text?: string;
 }
 
 export interface ViewInput {
@@ -54,14 +74,18 @@ export interface ViewInput {
   floor: Floor;
   /** Most tokens the whole view may use (ADR 0012). */
   budget: number;
+  /** Attachments by message id, chair messages and brief versions (ADR 0016). */
+  attachments?: Map<string, ViewAttachment[]>;
 }
 
 export interface View {
   messages: ChatMessage[];
   /** How many older messages were left out to fit the budget. */
   trimmedCount: number;
-  /** The view's size by the budget estimate. */
+  /** The view's size by the budget estimate, images included. */
   estimatedTokens: number;
+  /** The images' share of it. */
+  imageTokens: number;
 }
 
 const CHAIR = "Chair";
@@ -72,12 +96,27 @@ const WRAP_LABEL: Record<WrapKind, string> = {
   open_questions: "open questions",
 };
 
+interface ImagePart {
+  url: string;
+  tokens: number;
+}
+
 interface Item {
   role: "user" | "assistant";
   content: string;
+  images: ImagePart[];
+  /** Follows the images: "(The image above is …)" (ADR 0016). */
+  imageLabel?: string;
   isChair: boolean;
   /** A posted wrap-up: the latest one is kept when trimming (ADR 0015). */
   isSummary: boolean;
+  /** Never trimmed: the brief's images (ADR 0016). */
+  pinned?: boolean;
+}
+
+/** A text file as a seat reads it: inline, with its name (ADR 0016). */
+export function fileBlock(name: string, text: string): string {
+  return `<file name="${name.replace(/"/g, "'")}">\n${text}\n</file>`;
 }
 
 /** The shared record at a cutoff, brief versions included, in the order things entered it. */
@@ -113,38 +152,83 @@ export function buildView(input: ViewInput): View {
     .sort((a, b) => a.position - b.position)
     .map((s) => ({ displayName: s.displayName, model: s.model }));
 
+  const record = recordAt(messages, input.cutoffSeq);
+  const filesOf = (m: Message) => input.attachments?.get(m.id) ?? [];
+  const textBlocks = (m: Message) =>
+    filesOf(m)
+      .filter((f) => f.kind === "text" && f.text !== undefined)
+      .map((f) => fileBlock(f.name, f.text as string))
+      .join("\n\n");
+  const imagesOf = (m: Message): (ImagePart & { name: string })[] =>
+    filesOf(m)
+      .filter((f) => f.kind === "image" && f.url)
+      .map((f) => ({
+        name: f.name,
+        url: f.url as string,
+        tokens: imageTokens(f.width ?? 1024, f.height ?? 1024),
+      }));
+
+  // The brief at this cutoff: its text and text files in the intro, its images pinned at the top (ADR 0016).
+  const briefMessage = record.filter((m) => m.authorKind === "brief").at(-1);
+  const briefFiles = briefMessage ? textBlocks(briefMessage) : "";
+  const briefText = [briefAt(messages, input.cutoffSeq), briefFiles].filter(Boolean).join("\n\n");
+
   const intro = renderIntro({
     meetingTitle: input.meeting.title,
     self: { displayName: seat.displayName, model: seat.model, persona: seat.persona },
     roster,
     answerLength: seatAnswerLength(seat, input.meeting),
-    brief: briefAt(messages, input.cutoffSeq),
+    brief: briefText,
   });
   const floor = renderFloorNote(input.floor);
 
   const items: Item[] = [];
-  for (const m of recordAt(messages, input.cutoffSeq)) {
+  const briefImages = briefMessage ? imagesOf(briefMessage) : [];
+  if (briefImages.length) {
+    // Claude takes no images in the system prompt, so the brief's images open the conversation instead.
+    items.push({
+      role: "user",
+      content: "",
+      images: briefImages,
+      imageLabel: briefImagesNote(briefImages.map((i) => i.name)),
+      isChair: false,
+      isSummary: false,
+      pinned: true,
+    });
+  }
+  let started = false;
+  for (const m of record) {
     if (m.authorKind === "brief") {
       // The brief itself is in the intro. Once the discussion has started, a change leaves a line where it happened.
-      if (items.length)
+      const empty = !m.content.trim() && !filesOf(m).length;
+      if (started)
         items.push({
           role: "user",
-          content: m.content.trim() ? BRIEF_UPDATED_NOTE : BRIEF_CLEARED_NOTE,
+          content: empty ? BRIEF_CLEARED_NOTE : BRIEF_UPDATED_NOTE,
+          images: [],
           isChair: false,
           isSummary: false,
         });
       continue;
     }
-    if (!m.content.trim()) continue;
-    const content = m.stoppedEarly ? `${m.content}\n\n${CUT_OFF_NOTE}` : m.content;
+    const files = textBlocks(m);
+    const images = imagesOf(m);
+    if (!m.content.trim() && !files && !images.length) continue;
+    started = true;
+    const text = m.content.trim() ? m.content : ATTACHMENTS_ONLY;
+    const imageLabel = images.length ? imagesNote(images.map((i) => i.name)) : undefined;
+    const withFiles = files ? `${text}\n\n${files}` : text;
+    const content = m.stoppedEarly ? `${withFiles}\n\n${CUT_OFF_NOTE}` : withFiles;
     const isSummary = m.authorKind === "seat" && !!m.wrapKind;
     if (m.authorKind === "seat" && m.seatId === seat.id) {
-      items.push({ role: "assistant", content, isChair: false, isSummary });
+      items.push({ role: "assistant", content, images, imageLabel, isChair: false, isSummary });
       continue;
     }
     items.push({
       role: "user",
       content: `${speakerTag(m)}: ${content}`,
+      images,
+      imageLabel,
       isChair: m.authorKind === "chair",
       isSummary,
     });
@@ -169,19 +253,35 @@ export function buildView(input: ViewInput): View {
   const merged = merge(kept);
   if (merged[0]?.role === "assistant") merged.unshift({ role: "user", content: MEETING_STARTED });
   const last = merged[merged.length - 1];
-  if (last?.role === "user") last.content += `\n\n${floor}`;
+  if (last?.role === "user") appendText(last, floor);
   else merged.push({ role: "user", content: floor });
 
   const out: ChatMessage[] = [{ role: "system", content: intro }, ...merged];
+  const imageTokenTotal = kept.reduce(
+    (n, it) => n + it.images.reduce((t, i) => t + i.tokens, 0),
+    0,
+  );
   return {
     messages: out,
     trimmedCount,
-    estimatedTokens: out.reduce((n, m) => n + cost(m.content), 0),
+    estimatedTokens: out.reduce((n, m) => n + cost(textOf(m)), 0) + imageTokenTotal,
+    imageTokens: imageTokenTotal,
   };
+}
+
+/** A message's text, without its images. */
+export function textOf(m: ChatMessage): string {
+  return typeof m.content === "string"
+    ? m.content
+    : m.content.map((p) => (p.type === "text" ? p.text : "")).join("");
 }
 
 function cost(text: string): number {
   return budgetTokens(text) + MESSAGE_OVERHEAD_TOKENS;
+}
+
+function itemCost(it: Item): number {
+  return cost(it.content + (it.imageLabel ?? "")) + it.images.reduce((n, i) => n + i.tokens, 0);
 }
 
 /**
@@ -191,7 +291,7 @@ function cost(text: string): number {
  * dropped turns becomes one "(N older messages trimmed)" line.
  */
 function fitToBudget(items: Item[], budget: number): { kept: Item[]; trimmedCount: number } {
-  let size = items.reduce((n, it) => n + cost(it.content), 0);
+  let size = items.reduce((n, it) => n + itemCost(it), 0);
   if (size <= budget) return { kept: items, trimmedCount: 0 };
 
   const first = items.findIndex((it) => it.isChair);
@@ -206,14 +306,15 @@ function fitToBudget(items: Item[], budget: number): { kept: Item[]; trimmedCoun
   const order: number[] = [];
   if (summary > first) for (let i = first + 1; i < summary; i++) order.push(i);
   for (let i = Math.max(first, summary) + 1; i < last; i++) order.push(i);
+  const droppable = order.filter((i) => !items[i]?.pinned);
 
   // Room for the trim lines: at most one before the summary and one after it.
   size += 2 * cost(trimmedNote(999, true));
   const dropped = new Set<number>();
-  for (const i of order) {
+  for (const i of droppable) {
     if (size <= budget) break;
     dropped.add(i);
-    size -= cost((items[i] as Item).content);
+    size -= itemCost(items[i] as Item);
   }
   if (!dropped.size) return { kept: items, trimmedCount: 0 };
 
@@ -228,6 +329,7 @@ function fitToBudget(items: Item[], budget: number): { kept: Item[]; trimmedCoun
       kept.push({
         role: "user",
         content: trimmedNote(run, i === summary),
+        images: [],
         isChair: false,
         isSummary: false,
       });
@@ -238,14 +340,42 @@ function fitToBudget(items: Item[], budget: number): { kept: Item[]; trimmedCoun
   return { kept, trimmedCount: dropped.size };
 }
 
+/**
+ * Back-to-back items of the same role become one message (rule 3). A message with images becomes parts, in order:
+ * each item's text, then its images.
+ */
 function merge(items: Item[]): ChatMessage[] {
   const out: ChatMessage[] = [];
+  // An item with images is a message of its own, so llmgw's vision fallback describes each source's images apart
+  // and a text-only seat can tell them apart. Every family takes back-to-back user messages (checked 2026-11-04).
+  let alone = false;
   for (const it of items) {
-    const prev = out[out.length - 1];
-    if (prev && prev.role === it.role) prev.content += `\n\n${it.content}`;
-    else out.push({ role: it.role, content: it.content });
+    let msg = out[out.length - 1];
+    if (!msg || msg.role !== it.role || alone || it.images.length) {
+      msg = { role: it.role, content: it.content };
+      out.push(msg);
+    } else {
+      appendText(msg, it.content);
+    }
+    alone = it.images.length > 0;
+    if (alone) {
+      const parts: ChatPart[] = it.content ? [{ type: "text", text: it.content }] : [];
+      for (const img of it.images) parts.push({ type: "image_url", image_url: { url: img.url } });
+      if (it.imageLabel) parts.push({ type: "text", text: it.imageLabel });
+      msg.content = parts;
+    }
   }
   return out;
+}
+
+function appendText(msg: ChatMessage, text: string): void {
+  if (typeof msg.content === "string") {
+    msg.content = msg.content ? `${msg.content}\n\n${text}` : text;
+    return;
+  }
+  const lastPart = msg.content[msg.content.length - 1];
+  if (lastPart?.type === "text") lastPart.text += `\n\n${text}`;
+  else msg.content.push({ type: "text", text });
 }
 
 export { stripSpeakerTag } from "@homestorm/shared";

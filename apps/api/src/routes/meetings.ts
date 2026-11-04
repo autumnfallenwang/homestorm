@@ -6,7 +6,7 @@
 //   GET    /api/meetings/:id                           the whole meeting (MeetingState)
 //   PATCH  /api/meetings/:id                           rename, answer length (a change adds an event line)
 //   DELETE /api/meetings/:id
-//   PUT    /api/meetings/:id/brief                     set, change or clear the meeting brief { content }
+//   PUT    /api/meetings/:id/brief                     set, change or clear the brief { content, keepAttachmentIds?, attachments? }
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
 //   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort? }
@@ -14,10 +14,11 @@
 //                                                      (a name another seat has, or had, is 409)
 //   POST   /api/meetings/:id/seats/:seatId/move        { direction: up | down }
 //   DELETE /api/meetings/:id/seats/:seatId             remove from the meeting
-//   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo } (ADR 0006)
+//   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo, attachments } (ADR 0006)
 //   POST   /api/meetings/:id/wrap-up                   { seatId, kind, post }
 //   POST   /api/meetings/:id/stop                      { messageId? }
 //   POST   /api/meetings/:id/messages/:mid/retry|keep|skip|post
+//   GET    /api/meetings/:id/attachments/:aid          an attachment's bytes (images, text files)
 
 import {
   AddSeatInput,
@@ -40,6 +41,7 @@ import {
   WrapUpInput,
 } from "@homestorm/shared";
 import { type Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
 import { type Engine, EngineError } from "../engine/engine.js";
@@ -81,6 +83,12 @@ const BUDGET_LABEL: Record<ContextBudget, string> = {
   full: "Full",
 };
 
+/** Uploads ride in the JSON body as base64: 8 images of 5 MB plus text, with room to spare (ADR 0016). */
+const uploadLimit = bodyLimit({
+  maxSize: 64 * 1024 * 1024,
+  onError: (c) => c.json({ error: "Those files are too large to send together." }, 413),
+});
+
 export function meetingRoutes(deps: MeetingDeps) {
   const { engine, store, llm, hub } = deps;
   const app = new Hono<{ Variables: AuthVariables }>();
@@ -113,15 +121,33 @@ export function meetingRoutes(deps: MeetingDeps) {
   });
 
   // The meeting brief (ADR 0015): standing context every seat always sees. Empty clears it.
-  app.put("/meetings/:id/brief", async (c) => {
+  app.put("/meetings/:id/brief", uploadLimit, async (c) => {
     const input = await parse(c, SetBriefInput);
     if (input instanceof Response) return input;
     try {
-      const message = await engine.setBrief(c.req.param("id"), input.content);
+      const message = await engine.setBrief(c.req.param("id"), input.content, {
+        keepAttachmentIds: input.keepAttachmentIds,
+        attachments: input.attachments,
+      });
       return c.json({ changed: !!message, message });
     } catch (err) {
       return fail(c, err);
     }
+  });
+
+  // An attachment's bytes, for thumbnails, the full-size viewer and the export (ADR 0016). Text files are always
+  // served as plain text, so an uploaded .html can't run as a page on the API's origin.
+  app.get("/meetings/:id/attachments/:aid", async (c) => {
+    const file = await store.getAttachment(c.req.param("id"), c.req.param("aid"));
+    if (!file) return c.json({ error: "Not found" }, 404);
+    const type = file.kind === "image" ? file.mime : "text/plain; charset=utf-8";
+    return c.body(new Uint8Array(file.data), 200, {
+      "Content-Type": type,
+      "Content-Length": String(file.data.length),
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, max-age=31536000, immutable",
+    });
   });
 
   app.get("/meetings/:id", async (c) => {
@@ -164,7 +190,17 @@ export function meetingRoutes(deps: MeetingDeps) {
     }.md`;
     c.header("Content-Type", "text/markdown; charset=utf-8");
     c.header("Content-Disposition", `attachment; filename="${filename}"`);
-    return c.body(exportMarkdown(state));
+    // Text files go into the export whole (ADR 0016); images are listed by name.
+    const textIds = state.messages.flatMap((m) =>
+      m.attachments.filter((a) => a.kind === "text").map((a) => a.id),
+    );
+    const texts = new Map(
+      (await store.attachmentsWithData(state.meeting.id, textIds)).map((f) => [
+        f.id,
+        f.data.toString("utf8"),
+      ]),
+    );
+    return c.body(exportMarkdown(state, new Date(), texts));
   });
 
   // ── Live stream (ADR 0010) ────────────────────────────────────────────────
@@ -342,7 +378,7 @@ export function meetingRoutes(deps: MeetingDeps) {
   });
 
   // ── The one action API (ADR 0006) ─────────────────────────────────────────
-  app.post("/meetings/:id/actions", async (c) => {
+  app.post("/meetings/:id/actions", uploadLimit, async (c) => {
     const input = await parse(c, SendActionInput);
     if (input instanceof Response) return input;
     try {

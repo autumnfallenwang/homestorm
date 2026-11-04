@@ -36,6 +36,13 @@
       "when": 1793819686363,
       "tag": "0004_brief_author_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793822658064,
+      "tag": "0005_attachments",
+      "breakpoints": true
     }
   ]
 }

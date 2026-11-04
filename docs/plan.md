@@ -156,6 +156,13 @@ result (`~/agentic/mcpgw/dev/tool-loop-demo/`).
 - [ ] **Check first:** streaming `tool_calls` through llmgw (the demo used non-streaming calls)
 - [ ] **Tests:** a fake MCP server next to `FakeLlm`, seeded from the demo
 
+### Attachments ([ADR 0016](adr/0016-attachments-images-and-text-files.md))
+
+- [x] **Phase 1:** images (PNG, JPEG, WebP, GIF) and text files on the chair's messages and in the brief. Paperclip,
+  drag and drop, paste; resized in the browser; thumbnails and a full-size viewer; text-only seats named in a hint
+- [ ] **Phase 2:** PDF and DOCX, as extracted text
+- [ ] **Phase 3:** large documents through retrieval (mcpgw `docs_search`)
+
 ### Done after v1: the meeting brief and the full-context policy ✅
 
 - [x] Meeting brief: optional at creation, editable any time, on the meeting clock, never trimmed

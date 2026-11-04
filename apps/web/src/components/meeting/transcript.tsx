@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { api } from "@/lib/api";
 import { clockTime, compactNumber, plainText, roundProgress, sentToLine } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AttachmentStrip, shownSaved } from "./attachments";
 import { BriefCard, useCurrentBrief } from "./brief";
 import { Markdown } from "./markdown";
 import { useRoom } from "./room-context";
@@ -149,7 +150,7 @@ function ReplyQuote({ targetId }: { targetId: string }) {
 }
 
 function ChairMessage({ message }: { message: Message }) {
-  const { state, seatName } = useRoom();
+  const { id, state, seatName } = useRoom();
   const target = message.replyToId
     ? state.messages.find((m) => m.id === message.replyToId)
     : undefined;
@@ -167,9 +168,15 @@ function ChairMessage({ message }: { message: Message }) {
           {message.content ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <p className="italic opacity-80">(no note)</p>
+            !message.attachments.length && <p className="italic opacity-80">(no note)</p>
           )}
         </div>
+        {message.attachments.length > 0 && (
+          <AttachmentStrip
+            files={shownSaved(id, message.attachments)}
+            className="mt-1.5 justify-end"
+          />
+        )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         {sentToLine(message, (id) => seatName(id), replyAuthor)} · {clockTime(message.createdAt)}
@@ -361,19 +368,22 @@ function PostWrapUp({ message }: { message: Message }) {
 
 /** "You updated the meeting brief", with that version one click away (ADR 0015). */
 function BriefLine({ message }: { message: Message }) {
-  const { state } = useRoom();
+  const { id, state } = useRoom();
   const [open, setOpen] = useState(false);
   const firstBrief = state.messages.find((m) => m.authorKind === "brief")?.id === message.id;
-  const text = !message.content
+  const empty = !message.content && !message.attachments.length;
+  const text = empty
     ? "You cleared the meeting brief"
     : firstBrief
       ? "You set the meeting brief"
       : "You updated the meeting brief";
+  const files = message.attachments.length;
   return (
     <div className="text-center text-xs text-muted-foreground">
       <p>
         {text}
-        {message.content && (
+        {files > 0 && ` (${files} file${files === 1 ? "" : "s"})`}
+        {!empty && (
           <>
             {" · "}
             <button
@@ -387,9 +397,16 @@ function BriefLine({ message }: { message: Message }) {
         )}
       </p>
       {open && (
-        <p className="mx-auto mt-1.5 max-w-xl rounded-md border bg-muted/40 px-3 py-2 text-left whitespace-pre-wrap text-foreground">
-          {message.content}
-        </p>
+        <div className="mx-auto mt-1.5 max-w-xl rounded-md border bg-muted/40 px-3 py-2 text-left">
+          {message.content && (
+            <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
+          )}
+          <AttachmentStrip
+            files={shownSaved(id, message.attachments)}
+            size="sm"
+            className={message.content ? "mt-2" : undefined}
+          />
+        </div>
       )}
     </div>
   );

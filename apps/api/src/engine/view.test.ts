@@ -75,6 +75,7 @@ function msg(extra: Partial<Message> & Pick<Message, "authorKind">): Message {
     requestId: null,
     trimmedCount: 0,
     viewTokens: null,
+    attachments: [],
     stoppedEarly: false,
     createdAt: "2026-11-02T00:00:00.000Z",
     startedAt: null,
@@ -201,6 +202,75 @@ describe("buildView: roles and tags", () => {
 });
 
 // ── Visibility (ADR 0005) ───────────────────────────────────────────────────
+
+describe("buildView: attachments", () => {
+  const dot = {
+    kind: "image" as const,
+    name: "dot.png",
+    width: 640,
+    height: 360,
+    url: "data:image/png;base64,AAA",
+  };
+  const notes = {
+    kind: "text" as const,
+    name: "notes.md",
+    width: null,
+    height: null,
+    text: "# Notes",
+  };
+
+  it("sends a chair message's images as parts and its text files inline, then the floor note", () => {
+    seq = 0;
+    const q = chair("Look at these");
+    const v = view([q], gpt, { attachments: new Map([[q.id, [notes, dot]]]) });
+    const content = v.messages[1]?.content;
+    expect(Array.isArray(content)).toBe(true);
+    const parts = content as Exclude<typeof content, string | undefined>;
+    expect(parts[0]).toEqual({
+      type: "text",
+      text: '[Chair]: Look at these\n\n<file name="notes.md">\n# Notes\n</file>',
+    });
+    expect(parts[1]).toEqual({
+      type: "image_url",
+      image_url: { url: "data:image/png;base64,AAA" },
+    });
+    // The label follows the image, then the floor note.
+    expect(parts[2]?.type === "text" && parts[2].text).toMatch(
+      /^\(The image above: dot\.png\.\)\n\n\[Floor\]/,
+    );
+    // 640×360 ≈ 367 tokens on top of the text.
+    expect(v.imageTokens).toBe(368);
+  });
+
+  it("keeps a message that has only files", () => {
+    seq = 0;
+    const q = chair("");
+    const v = view([q], gpt, { attachments: new Map([[q.id, [dot]]]) });
+    expect(JSON.stringify(v.messages[1]?.content)).toContain("[Chair]: (See the attached files.)");
+  });
+
+  it("puts the brief's text files in the intro and pins its images at the top, even when trimming", () => {
+    seq = 0;
+    const b = msg({ authorKind: "brief", content: "Facts." });
+    const filler = "x".repeat(3_000);
+    const transcript = [
+      b,
+      chair("The question"),
+      ...[1, 2, 3].map((i) => said(ds, `turn${i} ${filler}`)),
+      chair("Latest"),
+    ];
+    const v = view(transcript, gpt, {
+      attachments: new Map([[b.id, [notes, dot]]]),
+      budget: 2_500,
+      floor: { kind: "direct" },
+    });
+    expect(v.messages[0]?.content).toContain('Facts.\n\n<file name="notes.md">\n# Notes\n</file>');
+    const first = JSON.stringify(v.messages[1]?.content);
+    expect(first).toContain("(The image above is from the meeting brief: dot.png.)");
+    expect(first).toContain("data:image/png;base64,AAA");
+    expect(v.trimmedCount).toBeGreaterThan(0);
+  });
+});
 
 describe("buildView: the meeting brief", () => {
   const brief = (content: string, extra: Partial<Message> = {}) =>

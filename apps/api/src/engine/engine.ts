@@ -9,7 +9,8 @@
 
 import { randomUUID } from "node:crypto";
 import {
-  briefAt,
+  type AttachmentInput,
+  type AttachmentMeta,
   canTakeFloor,
   contextBudgetTokens,
   type Meeting,
@@ -25,12 +26,18 @@ import {
   type WrapKind,
 } from "@homestorm/shared";
 import { log } from "../lib/logger.js";
+import {
+  AttachmentError,
+  checkBriefAttachments,
+  type PreparedAttachment,
+  prepareAttachments,
+} from "../services/attachments.js";
 import { type LlmClient, toLlmError } from "../services/llmgw.js";
-import type { MessagePatch, Store } from "../services/store.js";
+import type { AttachmentWithData, MessagePatch, Store } from "../services/store.js";
 import type { EventHub } from "./hub.js";
 import type { Floor, ReplyTarget } from "./prompts.js";
 import { displayTokens } from "./tokens.js";
-import { buildView } from "./view.js";
+import { buildView, textOf, type ViewAttachment } from "./view.js";
 
 /** A refused action, mapped onto an HTTP status by the routes. */
 export class EngineError extends Error {
@@ -62,6 +69,19 @@ export interface EngineOptions {
 
 const RUNNING_ROUND = "A round is running. Wait for it to finish, or stop it first.";
 
+/** Attachments kept decoded in memory; about 400 KB each after the browser's resize. */
+const FILE_CACHE_MAX = 300;
+
+/** Checked attachments, or a 400 the chair can read. */
+function prepareOrRefuse(inputs: AttachmentInput[]): PreparedAttachment[] {
+  try {
+    return prepareAttachments(inputs);
+  } catch (err) {
+    if (err instanceof AttachmentError) throw new EngineError(400, err.message);
+    throw err;
+  }
+}
+
 /** How event lines name a wrap-up, e.g. "You posted Scribe's decision". */
 const WRAP_NOUN: Record<WrapKind, string> = {
   minutes: "minutes",
@@ -79,6 +99,8 @@ export class Engine {
   private readonly active = new Map<string, ActiveRound>();
   /** message id → text streamed so far (raw, before the speaker tag is stripped). */
   private readonly live = new Map<string, string>();
+  /** Attachments as views use them, by id (ADR 0016). */
+  private readonly fileCache = new Map<string, ViewAttachment>();
 
   constructor(opts: EngineOptions) {
     this.store = opts.store;
@@ -119,10 +141,11 @@ export class Engine {
   /** The one action API (ADR 0006): a message, a round, a reply-to, or "Ask now". */
   async send(
     meetingId: string,
-    action: SendAction,
+    action: Omit<SendAction, "attachments"> & { attachments?: AttachmentInput[] },
   ): Promise<{ message: Message | null; round: Round | null }> {
     const meeting = await this.requireMeeting(meetingId);
     const text = action.text.trim();
+    const files = prepareOrRefuse(action.attachments ?? []);
 
     if (action.mode === "none") {
       const message = await this.postChair(meeting, {
@@ -130,6 +153,7 @@ export class Engine {
         sendMode: "none",
         targetSeatIds: null,
         replyToId: action.replyTo,
+        files,
       });
       return { message, round: null };
     }
@@ -164,12 +188,13 @@ export class Engine {
     }
 
     const message =
-      text || replyTo
+      text || replyTo || files.length
         ? await this.postChair(meeting, {
             text,
             sendMode: action.targets === "everyone" ? action.mode : "seats",
             targetSeatIds: action.targets === "everyone" ? null : targets.map((s) => s.id),
             replyToId: replyTo?.id ?? null,
+            files,
           })
         : null;
 
@@ -321,15 +346,43 @@ export class Engine {
    * Set, change or clear the meeting brief (ADR 0015). Each change is a new version on the meeting clock, so a turn
    * gets the version from before it started. No change, no new version.
    */
-  async setBrief(meetingId: string, content: string): Promise<Message | null> {
+  async setBrief(
+    meetingId: string,
+    content: string,
+    files: { keepAttachmentIds?: string[]; attachments?: AttachmentInput[] } = {},
+  ): Promise<Message | null> {
     await this.requireMeeting(meetingId);
     const text = content.trim();
     const state = await this.store.getState(meetingId);
-    const current = state ? briefAt(state.messages, state.meeting.clock) : "";
-    if (text === current) return null;
+    const currentMessage = state?.messages
+      .filter((m) => m.authorKind === "brief" && m.visibleSeq !== null)
+      .sort((a, b) => (a.visibleSeq ?? 0) - (b.visibleSeq ?? 0))
+      .at(-1);
+    const current = currentMessage?.content.trim() ?? "";
+    const currentFiles = currentMessage?.attachments ?? [];
+    // Omitted: keep every current file (a text-only edit). Otherwise only the ones named, in that order.
+    const keepIds = files.keepAttachmentIds ?? currentFiles.map((f) => f.id);
+    const kept = keepIds.map((id) => {
+      const f = currentFiles.find((c) => c.id === id);
+      if (!f) throw new EngineError(400, "That file isn't in the current brief.");
+      return f;
+    });
+    const added = prepareOrRefuse(files.attachments ?? []);
+    try {
+      checkBriefAttachments(kept, added);
+    } catch (err) {
+      if (err instanceof AttachmentError) throw new EngineError(400, err.message);
+      throw err;
+    }
+    const sameFiles =
+      !added.length &&
+      kept.length === currentFiles.length &&
+      kept.every((f, i) => f.id === currentFiles[i]?.id);
+    if (text === current && sameFiles) return null;
+
     const visibleSeq = await this.store.bumpClock(meetingId);
     const now = new Date();
-    const message = await this.store.insertMessage({
+    const inserted = await this.store.insertMessage({
       meetingId,
       authorKind: "brief",
       content: text,
@@ -338,13 +391,90 @@ export class Engine {
       startedAt: now,
       finishedAt: now,
     });
+    // Every version is whole: the files it keeps are copied to it, so older versions stay as they were.
+    const keptRows = await this.store.attachmentsWithData(
+      meetingId,
+      kept.map((f) => f.id),
+    );
+    const carried: PreparedAttachment[] = kept.map((f) => {
+      const row = keptRows.find((r) => r.id === f.id) as AttachmentWithData;
+      return {
+        kind: row.kind,
+        name: row.name,
+        mime: row.mime,
+        sizeBytes: row.sizeBytes,
+        width: row.width,
+        height: row.height,
+        textChars: row.textChars,
+        data: row.data,
+      };
+    });
+    const message = {
+      ...inserted,
+      attachments: await this.saveFiles(inserted, [...carried, ...added]),
+    };
     this.emit(meetingId, { type: "message", message });
     await this.emitMeeting(meetingId);
     log.info(
-      { event: "brief.set", meeting_id: meetingId, chars: text.length, visible_seq: visibleSeq },
-      text ? "meeting brief saved" : "meeting brief cleared",
+      {
+        event: "brief.set",
+        meeting_id: meetingId,
+        chars: text.length,
+        files: message.attachments.length,
+        visible_seq: visibleSeq,
+      },
+      text || message.attachments.length ? "meeting brief saved" : "meeting brief cleared",
     );
     return message;
+  }
+
+  /** Save a message's attachments, in order (ADR 0016). */
+  private async saveFiles(
+    message: Message,
+    files: PreparedAttachment[],
+  ): Promise<AttachmentMeta[]> {
+    return this.store.insertAttachments(
+      files.map((f, position) => ({
+        ...f,
+        meetingId: message.meetingId,
+        messageId: message.id,
+        position,
+      })),
+    );
+  }
+
+  /**
+   * What a view needs of every attachment in the record: images as data URLs, text files as text. They never
+   * change, so they're cached by id.
+   */
+  private async viewAttachments(state: MeetingState): Promise<Map<string, ViewAttachment[]>> {
+    const wanted = state.messages.flatMap((m) => m.attachments.map((a) => a.id));
+    const missing = wanted.filter((id) => !this.fileCache.has(id));
+    if (missing.length) {
+      for (const row of await this.store.attachmentsWithData(state.meeting.id, missing)) {
+        this.fileCache.set(row.id, {
+          kind: row.kind,
+          name: row.name,
+          width: row.width,
+          height: row.height,
+          ...(row.kind === "image"
+            ? { url: `data:${row.mime};base64,${row.data.toString("base64")}` }
+            : { text: row.data.toString("utf8") }),
+        });
+        if (this.fileCache.size > FILE_CACHE_MAX) {
+          const oldest = this.fileCache.keys().next().value;
+          if (oldest) this.fileCache.delete(oldest);
+        }
+      }
+    }
+    const map = new Map<string, ViewAttachment[]>();
+    for (const m of state.messages) {
+      const files = m.attachments
+        .map((a) => this.fileCache.get(a.id))
+        .filter((f): f is ViewAttachment => !!f);
+      if (files.length) map.set(m.id, files);
+    }
+    return map;
   }
 
   /** A transcript line for the chair, e.g. "You muted Claude Sonnet 5.5 for rounds". Seats never see these. */
@@ -380,11 +510,12 @@ export class Engine {
       sendMode: Message["sendMode"];
       targetSeatIds: string[] | null;
       replyToId: string | null;
+      files: PreparedAttachment[];
     },
   ): Promise<Message> {
     const visibleSeq = await this.store.bumpClock(meeting.id);
     const now = new Date();
-    const message = await this.store.insertMessage({
+    const inserted = await this.store.insertMessage({
       meetingId: meeting.id,
       authorKind: "chair",
       content: p.text,
@@ -396,6 +527,7 @@ export class Engine {
       startedAt: now,
       finishedAt: now,
     });
+    const message = { ...inserted, attachments: await this.saveFiles(inserted, p.files) };
     this.emit(meeting.id, { type: "message", message });
     await this.emitMeeting(meeting.id);
     return message;
@@ -609,6 +741,7 @@ export class Engine {
         outputCap,
         this.budget,
       ),
+      attachments: await this.viewAttachments(state),
     });
 
     const requestId = `homestorm-${randomUUID()}`;
@@ -645,6 +778,8 @@ export class Engine {
 
     const ac = new AbortController();
     ctx.controllers.set(messageId, ac);
+    // Stop all can arrive while this turn was still setting up, before it had a controller to abort.
+    if (ctx.stopRequested) ac.abort();
     let text = "";
     this.live.set(messageId, "");
     let lastFlush = Date.now();
@@ -705,7 +840,8 @@ export class Engine {
         };
       } else {
         const visibleSeq = msg.hiddenFromSeats ? null : await this.store.bumpClock(meetingId);
-        const promptText = view.messages.map((m) => m.content).join("\n");
+        const promptText = view.messages.map(textOf).join("\n");
+        const promptTokens = displayTokens(promptText) + view.imageTokens;
         result = {
           status: "done",
           content,
@@ -714,9 +850,9 @@ export class Engine {
           usage: done.usage
             ? { ...done.usage, estimated: false }
             : {
-                promptTokens: displayTokens(promptText),
+                promptTokens,
                 completionTokens: displayTokens(content),
-                totalTokens: displayTokens(promptText) + displayTokens(content),
+                totalTokens: promptTokens + displayTokens(content),
                 estimated: true,
               },
           costUsd: done.costUsd,
