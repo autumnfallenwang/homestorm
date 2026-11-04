@@ -136,6 +136,10 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
   profile.
 - **Middle: the meeting.**
   - **Header:** title, status ("Round 2 in progress"), token count and DeepSeek spend, Export, Wrap up ▾.
+  - **Meeting brief** (added 2026-11-04, [ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md)): a card
+    pinned above the transcript with the standing context every seat always sees, and Edit. Empty, it's a dashed
+    "Add a meeting brief" prompt. Each change shows in the transcript as "You updated the meeting brief · show this
+    version". Posted wrap-ups get "Copy into the brief".
   - **Chair messages on the right**, in a bubble. Under each is a line saying where it went ("Sent to everyone · blind",
     "Asked GPT-6 Luna to respond").
   - **Seat messages on the left:** avatar, name, a source tag ("Claude · subscription", "GPT · ChatGPT",
@@ -156,8 +160,9 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
     resets <date>", "NN% left this month · resets <date>", "$X.XX left"), and Ask / Mute / ⋯.
   - Muted seats get a dashed card: "Skipped in rounds. Still hears everything."
   - Add seat at the top.
-  - A **Room rules** box: new questions go to (Everyone · blind), answer length (Concise), plus two that are always on:
-    seats speak only when called, and seats may disagree with the chair.
+  - A **Room rules** box: answer length (Concise), plus two that are always on: seats speak only when called, and
+    seats may disagree with the chair. Blind or in turn is picked per message in the message box, which starts on
+    Everyone · blind; the room rule for "new questions go to" was removed on 2026-11-03 because it duplicated it.
 
 ### Controls and states (see the mockup's board 2)
 
@@ -216,7 +221,7 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
 
 ## 7. Next: the data model
 
-- **meeting:** title, room rules (default send-to, answer length), status.
+- **meeting:** title, room rule (answer length), status.
 - **seat:** model ID, `owned_by`, display name, persona, order, muted.
 - **message:** author (chair or a seat), content, round, reply-to, status (streaming / done / stopped / error),
   usage, cost, llmgw `req_id`, start and finish times (the visibility rule depends on them).

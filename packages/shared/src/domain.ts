@@ -39,7 +39,8 @@ export const MESSAGE_STATUSES = [
 export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 
 /** Who wrote a message. `event` is a transcript line such as "You muted Claude Sonnet 5.5". */
-export const AUTHOR_KINDS = ["chair", "seat", "event"] as const;
+/** `brief`: a version of the meeting brief (ADR 0015). It enters the record on the clock but isn't a message seats read. */
+export const AUTHOR_KINDS = ["chair", "seat", "event", "brief"] as const;
 export type AuthorKind = (typeof AUTHOR_KINDS)[number];
 
 export const ANSWER_LENGTHS = ["concise", "detailed"] as const;
@@ -48,6 +49,10 @@ export type AnswerLength = (typeof ANSWER_LENGTHS)[number];
 /** Per-seat thinking effort (ADR 0012). llmgw accepts more levels; the UI offers these three. */
 export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/** How much of the meeting a seat's view may hold (ADR 0012); see contextBudgetTokens in budget.ts. */
+export const CONTEXT_BUDGETS = ["small", "standard", "large", "full"] as const;
+export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
 
 export const WRAP_KINDS = ["minutes", "decision", "open_questions"] as const;
 export type WrapKind = (typeof WRAP_KINDS)[number];
@@ -84,8 +89,6 @@ export interface Usage {
 export interface Meeting {
   id: string;
   title: string;
-  /** What the message box's send-to selector starts on. */
-  defaultMode: Exclude<SendMode, "none">;
   answerLength: AnswerLength;
   /** Logical clock: bumped each time a message enters the shared record. See docs/data-model.md. */
   clock: number;
@@ -105,6 +108,10 @@ export interface Seat {
   position: number;
   muted: boolean;
   reasoningEffort: ReasoningEffort;
+  /** This seat's own answer length; null follows the room rule (ADR 0012). */
+  answerLength: AnswerLength | null;
+  /** How much of the meeting its view may hold; null is Standard (ADR 0012). */
+  contextBudget: ContextBudget | null;
   /** Removed seats stay so their old messages keep a name. */
   removedAt: string | null;
   createdAt: string;
@@ -161,6 +168,8 @@ export interface Message {
   requestId: string | null;
   /** How many older messages were trimmed from this seat's view (ADR 0012). */
   trimmedCount: number;
+  /** The view's size by the budget estimate when the turn started, for the seat card's context bar. */
+  viewTokens: number | null;
   /** A stopped answer whose partial text the chair kept. */
   stoppedEarly: boolean;
   createdAt: string;
@@ -189,25 +198,54 @@ export interface MeetingSummary {
 
 // ── Requests ────────────────────────────────────────────────────────────────
 
+/** The meeting brief's size cap (ADR 0015): about 4,000 tokens, so it fits even a Small context budget. */
+export const BRIEF_MAX_CHARS = 12_000;
+
 export const CreateMeetingInput = z.object({
   title: z.string().trim().min(1).max(200),
+  /** Optional standing context every seat always sees. */
+  brief: z.string().max(BRIEF_MAX_CHARS).optional(),
 });
 export type CreateMeetingInput = z.infer<typeof CreateMeetingInput>;
 
 export const UpdateMeetingInput = z
   .object({
     title: z.string().trim().min(1).max(200),
-    defaultMode: z.enum(["blind", "in_turn"]),
     answerLength: z.enum(ANSWER_LENGTHS),
   })
   .partial();
 export type UpdateMeetingInput = z.infer<typeof UpdateMeetingInput>;
+
+/** Set, change or clear (empty) the meeting brief. */
+export const SetBriefInput = z.object({ content: z.string().max(BRIEF_MAX_CHARS) });
+export type SetBriefInput = z.infer<typeof SetBriefInput>;
+
+/** The brief seats get at a clock value: the latest version at or before it ("" when none or cleared). */
+export function briefAt(
+  messages: Pick<Message, "authorKind" | "visibleSeq" | "content">[],
+  cutoffSeq: number,
+): string {
+  let brief = "";
+  let at = -1;
+  for (const m of messages) {
+    if (m.authorKind !== "brief" || m.visibleSeq === null || m.visibleSeq > cutoffSeq) continue;
+    if (m.visibleSeq > at) {
+      at = m.visibleSeq;
+      brief = m.content.trim();
+    }
+  }
+  return brief;
+}
 
 export const AddSeatInput = z.object({
   model: z.string().trim().min(1).max(200),
   displayName: z.string().trim().min(1).max(60).optional(),
   persona: z.string().trim().max(2000).optional(),
   reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+  /** Omitted or null: follow the room rule. */
+  answerLength: z.enum(ANSWER_LENGTHS).nullable().optional(),
+  /** Omitted or null: Standard. */
+  contextBudget: z.enum(CONTEXT_BUDGETS).nullable().optional(),
 });
 export type AddSeatInput = z.infer<typeof AddSeatInput>;
 
@@ -217,9 +255,24 @@ export const UpdateSeatInput = z
     persona: z.string().trim().max(2000).nullable(),
     muted: z.boolean(),
     reasoningEffort: z.enum(REASONING_EFFORTS),
+    /** null: back to the room rule. */
+    answerLength: z.enum(ANSWER_LENGTHS).nullable(),
+    /** null: back to Standard. */
+    contextBudget: z.enum(CONTEXT_BUDGETS).nullable(),
   })
   .partial();
 export type UpdateSeatInput = z.infer<typeof UpdateSeatInput>;
+
+/**
+ * The answer length a seat works to (ADR 0012): its own setting, or else the room rule. The chair's message can still
+ * ask for more or less on one turn; that's in the prompt, not here.
+ */
+export function seatAnswerLength(
+  seat: Pick<Seat, "answerLength">,
+  meeting: Pick<Meeting, "answerLength">,
+): AnswerLength {
+  return seat.answerLength ?? meeting.answerLength;
+}
 
 export const MoveSeatInput = z.object({ direction: z.enum(["up", "down"]) });
 export type MoveSeatInput = z.infer<typeof MoveSeatInput>;

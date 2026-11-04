@@ -1,7 +1,10 @@
 "use client";
 
 import {
+  type AnswerLength,
+  type ContextBudget,
   type ModelInfo,
+  maxOutputTokens,
   prettyModelName,
   type ReasoningEffort,
   type Source,
@@ -35,6 +38,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { api, type ModelsResponse } from "@/lib/api";
 import { allowanceLine, compareModels } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AnswerLengthSelect } from "./answer-length-select";
+import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
 
@@ -56,6 +61,8 @@ export function AddSeatDialog() {
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
+  const [length, setLength] = useState<AnswerLength | null>(null);
+  const [budget, setBudget] = useState<ContextBudget | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -86,6 +93,8 @@ export function AddSeatDialog() {
     setName("");
     setPersona("");
     setEffort("low");
+    setLength(null);
+    setBudget(null);
     setQuery("");
   }
 
@@ -98,6 +107,8 @@ export function AddSeatDialog() {
         displayName: name.trim() || undefined,
         persona: persona.trim() || undefined,
         reasoningEffort: effort,
+        answerLength: length,
+        contextBudget: budget,
       }),
     );
     setBusy(false);
@@ -264,6 +275,22 @@ export function AddSeatDialog() {
                 </SelectContent>
               </Select>
             </div>
+            <AnswerLengthSelect
+              value={length}
+              onChange={setLength}
+              roomRule={state.meeting.answerLength}
+            />
+            <ContextBudgetSelect
+              value={budget}
+              onChange={setBudget}
+              contextWindow={picked.contextWindow}
+              outputCap={maxOutputTokens(
+                length ?? state.meeting.answerLength,
+                effort,
+                picked.maxTokens,
+              )}
+              standard={data?.standardContextBudget ?? null}
+            />
           </div>
         )}
 

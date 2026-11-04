@@ -34,6 +34,8 @@ function seat(
     position,
     muted: false,
     reasoningEffort: "low",
+    answerLength: null,
+    contextBudget: null,
     removedAt: null,
     createdAt: "2026-11-02T00:00:00.000Z",
     ...extra,
@@ -72,6 +74,7 @@ function msg(extra: Partial<Message> & Pick<Message, "authorKind">): Message {
     llmgwReqId: null,
     requestId: null,
     trimmedCount: 0,
+    viewTokens: null,
     stoppedEarly: false,
     createdAt: "2026-11-02T00:00:00.000Z",
     startedAt: null,
@@ -199,6 +202,40 @@ describe("buildView: roles and tags", () => {
 
 // ── Visibility (ADR 0005) ───────────────────────────────────────────────────
 
+describe("buildView: the meeting brief", () => {
+  const brief = (content: string, extra: Partial<Message> = {}) =>
+    msg({ authorKind: "brief", content, ...extra });
+
+  it("puts the brief at the turn's cutoff in the intro, and marks a later change in the record", () => {
+    seq = 0;
+    const v1 = brief("Facts v1: one node."); // visible at 1
+    const q = chair("Edge or API?"); // 2
+    const v2 = brief("Facts v2: two nodes."); // 3
+    const before = view([v1, q, v2], gpt, { cutoffSeq: 2 });
+    expect(before.messages[0]?.content).toContain(
+      "Meeting brief from the Chair (background and facts for the whole meeting):\nFacts v1: one node.",
+    );
+    expect(before.messages.map((m) => m.content).join("\n")).not.toContain(
+      "updated the meeting brief",
+    );
+
+    const after = view([v1, q, v2], gpt, { cutoffSeq: 3 });
+    expect(after.messages[0]?.content).toContain("Facts v2: two nodes.");
+    expect(after.messages[0]?.content).not.toContain("Facts v1");
+    // Set before the discussion: no line. Changed after it started: one line where it happened.
+    expect(after.messages[1]?.content).toBe(
+      "[Chair]: Edge or API?\n\n(The Chair updated the meeting brief. Your instructions have the current version.)\n\n[Floor] All 3 participants answer this independently: you can't see the others' answers and they can't see yours. Give your own view.",
+    );
+  });
+
+  it("drops the brief from the intro once it's cleared", () => {
+    seq = 0;
+    const v = view([brief("Facts."), chair("Q"), brief("")], gpt);
+    expect(v.messages[0]?.content).not.toContain("Meeting brief");
+    expect(v.messages[1]?.content).toContain("(The Chair cleared the meeting brief.)");
+  });
+});
+
 describe("buildView: visibility", () => {
   it("blind round: a seat doesn't see answers that finished after its turn started", () => {
     seq = 0;
@@ -295,6 +332,48 @@ describe("buildView: trimming", () => {
     expect(text).toContain(`(${v.trimmedCount} older messages trimmed to fit the context window.)`);
     expect(text).not.toContain("0 xxx");
     expect(v.messages[0]?.role).toBe("system");
+  });
+
+  it("drops turns before the latest posted wrap-up first, and keeps the wrap-up", () => {
+    seq = 0;
+    const filler = "x".repeat(3_000); // ~1,000 budget tokens each
+    const transcript = [
+      chair("The original question"),
+      ...[1, 2, 3, 4].map((i) => said(gpt, `before${i} ${filler}`)),
+      said(ds, "## Minutes\nWe agreed on B.", { wrapKind: "minutes" }),
+      said(gpt, `after1 ${filler}`),
+      said(gpt, `after2 ${filler}`),
+      chair("The latest question"),
+    ];
+    const full = view(transcript, claude, { floor: { kind: "direct" } }).estimatedTokens;
+
+    // About 3,500 over: the four turns before the minutes go, nothing after them.
+    const v = view(transcript, claude, { budget: full - 3_500, floor: { kind: "direct" } });
+    const text = v.messages.map((m) => m.content).join("\n");
+    expect(v.trimmedCount).toBe(4);
+    expect(text).toContain("[Chair]: The original question");
+    expect(text).toContain("(4 older messages trimmed; the summary below covers them.)");
+    expect(text).toContain("[DeepSeek V4 Pro, meeting minutes]: ## Minutes");
+    expect(text).toContain("after1");
+    expect(text).not.toContain("before1");
+
+    // About 5,500 over: then the oldest after the minutes go too, but the minutes stay.
+    const w = view(transcript, claude, { budget: full - 5_500, floor: { kind: "direct" } });
+    const wText = w.messages.map((m) => m.content).join("\n");
+    expect(w.trimmedCount).toBe(6);
+    expect(wText).toContain("We agreed on B.");
+    expect(wText).toContain("(2 older messages trimmed to fit the context window.)");
+    expect(wText).toContain("[Chair]: The latest question");
+    expect(wText).not.toContain("after2");
+  });
+
+  it("asks a seat with its own answer length for that length, and the others for the room's", () => {
+    seq = 0;
+    const scribe = { ...ds, answerLength: "detailed" as const };
+    const own = view([chair("Q")], scribe, { seats: [claude, gpt, scribe] });
+    expect(own.messages[0]?.content).toContain("Answer thoroughly");
+    const other = view([chair("Q")], claude, { seats: [claude, gpt, scribe] });
+    expect(other.messages[0]?.content).toContain("Keep answers concise");
   });
 
   it("trims nothing when the meeting fits", () => {

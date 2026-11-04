@@ -28,9 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import { allowanceLine, seatStatus } from "@/lib/format";
+import { allowanceLine, compactNumber, seatStatus } from "@/lib/format";
+import { percentLabel, type SeatContext, seatContext } from "@/lib/seat-context";
 import { cn } from "@/lib/utils";
 import { AddSeatDialog } from "./add-seat-dialog";
+import { LENGTH_LABEL } from "./answer-length-select";
+import { BUDGET_LABEL } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
 
@@ -73,6 +76,7 @@ const STATUS_TONE: Record<string, string> = {
 
 function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boolean }) {
   const { id, state, limits, running, act, openEditSeat } = useRoom();
+  const context = useContextLine(seat);
   const lim = limits[seat.id];
   const status = seatStatus(seat, state, lim);
   const allowance = allowanceLine(lim);
@@ -95,6 +99,10 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
           <p className="truncate font-mono text-[0.6875rem] text-muted-foreground">
             {seat.model}
             {seat.reasoningEffort !== "low" && ` · effort ${seat.reasoningEffort}`}
+            {seat.answerLength && ` · ${LENGTH_LABEL[seat.answerLength]} answers`}
+            {seat.contextBudget &&
+              seat.contextBudget !== "standard" &&
+              ` · ${BUDGET_LABEL[seat.contextBudget]} context`}
           </p>
         </div>
         <span className={cn("shrink-0 text-xs font-medium", STATUS_TONE[status])}>{status}</span>
@@ -140,6 +148,28 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
         )}
       </div>
 
+      {context && (
+        <div className="mt-2">
+          <p
+            title={context.detail}
+            className={cn("text-xs", context.tone === "ok" ? "text-muted-foreground" : "text-warn")}
+          >
+            {context.text}
+          </p>
+          {context.percent !== null && (
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  context.tone === "ok" ? "bg-muted-foreground/50" : "bg-warn",
+                )}
+                style={{ width: `${Math.max(2, context.percent)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-2.5 flex gap-1.5">
         <Button size="sm" variant="outline" className="h-7 flex-1" onClick={ask} disabled={!canAsk}>
           <Hand className="size-3.5" />
@@ -171,7 +201,7 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => openEditSeat(seat)}>
               <Pencil />
-              Edit name and persona
+              Edit seat…
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -213,23 +243,6 @@ function RoomRules() {
       </h3>
       <div className="space-y-2 text-sm">
         <label className="flex items-center justify-between gap-2">
-          <span className="whitespace-nowrap text-muted-foreground">New questions</span>
-          <Select
-            value={m.defaultMode}
-            onValueChange={(v) =>
-              act(() => api.updateMeeting(id, { defaultMode: v as "blind" | "in_turn" }))
-            }
-          >
-            <SelectTrigger size="sm" className="h-7 w-40 text-xs" aria-label="New questions go to">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="blind">Everyone · blind</SelectItem>
-              <SelectItem value="in_turn">Everyone · in turn</SelectItem>
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="flex items-center justify-between gap-2">
           <span className="whitespace-nowrap text-muted-foreground">Answer length</span>
           <Select
             value={m.answerLength}
@@ -255,4 +268,40 @@ function RoomRules() {
       </div>
     </section>
   );
+}
+
+/**
+ * "Context ≈6.4k of 120k · 5%": the seat's last view against its budget (ADR 0015), so the chair sees how close it is
+ * to trimming. Our own estimate (characters ÷ 3, the same one trimming uses): llmgw doesn't report usage for streamed
+ * answers. Amber from 80%; "Trimming older turns" once its last turn was trimmed. Null until the models have loaded.
+ */
+function useContextLine(seat: Seat): {
+  text: string;
+  detail: string;
+  percent: number | null;
+  tone: SeatContext["tone"];
+} | null {
+  const { state, models, standardContextBudget } = useRoom();
+  if (standardContextBudget === null) return null;
+  const ctx = seatContext(seat, state, models, standardContextBudget);
+  const windowLine = ctx.window
+    ? `Model window: ${ctx.window.toLocaleString("en-US")} tokens.`
+    : "";
+  if (ctx.last === null || ctx.percent === null)
+    return {
+      text: `Context budget ${compactNumber(ctx.budget)}`,
+      detail: `No turn yet. ${windowLine}`.trim(),
+      percent: null,
+      tone: "ok",
+    };
+  const size = `Context ≈${compactNumber(ctx.last)} of ${compactNumber(ctx.budget)} · ${percentLabel(ctx.percent)}`;
+  const ofWindow = ctx.window
+    ? ` That's ${percentLabel((ctx.last / ctx.window) * 100)} of the model's ${compactNumber(ctx.window)} window.`
+    : "";
+  return {
+    text: ctx.tone === "trimming" ? `Trimming older turns · ${size}` : size,
+    detail: `Last view ≈${ctx.last.toLocaleString("en-US")} tokens (estimated) of this seat's ${ctx.budget.toLocaleString("en-US")}-token budget.${ofWindow}`,
+    percent: ctx.percent,
+    tone: ctx.tone,
+  };
 }

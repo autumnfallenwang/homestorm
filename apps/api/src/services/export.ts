@@ -1,6 +1,7 @@
 // A meeting as Markdown (v1 scope, ADR 0009): seats, then the transcript in order, rounds as headings.
 
 import {
+  briefAt,
   type MeetingState,
   type Message,
   type Round,
@@ -47,6 +48,8 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
       const notes = [
         s.removedAt ? "left the meeting" : "",
         s.muted ? "muted" : "",
+        s.answerLength ? `answers: ${s.answerLength}` : "",
+        s.contextBudget && s.contextBudget !== "standard" ? `context: ${s.contextBudget}` : "",
         s.persona ? `persona: ${oneLine(s.persona)}` : "",
       ]
         .filter(Boolean)
@@ -54,9 +57,11 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
       return `| ${s.displayName} | \`${s.model}\` | ${sourceLabel(s.ownedBy)} | ${notes} |`;
     }),
     "",
-    "## Transcript",
-    "",
   ];
+  const brief = briefAt(messages, meeting.clock);
+  const firstBriefId = messages.find((m) => m.authorKind === "brief")?.id;
+  if (brief) out.push("## Meeting brief", "", brief, "");
+  out.push("## Transcript", "");
 
   const headed = new Set<string>();
   const heading = (r: Round) => {
@@ -73,6 +78,16 @@ export function exportMarkdown(state: MeetingState, now = new Date()): string {
     if (m.status === "queued") continue;
     if (m.authorKind === "event") {
       out.push(`_${m.content}_`, "");
+      continue;
+    }
+    if (m.authorKind === "brief") {
+      const verb = m.id === firstBriefId ? "set" : "updated";
+      out.push(
+        m.content
+          ? `_You ${verb} the meeting brief:_\n\n${quote(m.content)}`
+          : "_You cleared the meeting brief_",
+        "",
+      );
       continue;
     }
     const promptOf = roundByPrompt.get(m.id);

@@ -19,7 +19,9 @@ now): ADRs [0004](0004-per-seat-view-of-shared-transcript.md) and
     - the roster (the chair and every seat);
     - how the meeting works;
     - the etiquette rules from [meeting-control-design.md](../meeting-control-design.md) §3;
-    - the answer-length rule.
+    - the answer-length rule;
+    - the meeting brief, when there is one, after the title (added 2026-11-04,
+      [ADR 0015](0015-meeting-brief-and-full-context-policy.md)).
   - **Optional persona:** the seat's own text, appended at the end of the intro.
   - **Floor notes:** one per way of being called, added at the end of the last `user` message as a line starting
     `[Floor]`:
@@ -28,6 +30,10 @@ now): ADRs [0004](0004-per-seat-view-of-shared-transcript.md) and
     - in turn, "You are 2nd of 3";
     - reply to a message, quoting its first 300 characters;
     - wrap up as minutes, a decision, or open questions.
+  - **Brief notes** (added 2026-11-04): where a brief version entered the record after the discussion started,
+    "(The Chair updated the meeting brief. Your instructions have the current version.)", or "(The Chair cleared the
+    meeting brief.)". Trim lines say "(N older messages trimmed; the summary below covers them.)" right before the
+    latest posted wrap-up.
   - **Cut-off note** (added 2026-11-03): an answer the chair stopped and kept ends with "(The Chair stopped this
     answer here.)", in every view including its author's, so no seat reads the cut-off text as a finished answer.
 - **No user-editable templates in v1.** Only the persona is per seat.

@@ -1,12 +1,13 @@
 "use client";
 
-import type { Message, Seat } from "@homestorm/shared";
+import { briefAt, type Message, type Seat } from "@homestorm/shared";
 import { Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMeetings } from "@/components/shell/meetings-context";
 import { Button } from "@/components/ui/button";
-import { useLimits, useMeeting } from "@/hooks/use-meeting";
+import { useLimits, useMeeting, useModels } from "@/hooks/use-meeting";
+import { BriefDialog } from "./brief";
 import { Composer } from "./composer";
 import { EditSeatDialog } from "./edit-seat-dialog";
 import { MeetingHeader } from "./meeting-header";
@@ -25,12 +26,14 @@ export function MeetingRoom({ id }: { id: string }) {
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [wrapOpen, setWrapOpen] = useState(false);
   const [editSeat, setEditSeat] = useState<Seat | null>(null);
+  const [briefDraft, setBriefDraft] = useState<string | null>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
 
   const running = !!state?.rounds.some((r) => r.status === "running");
   const roundKey = state ? state.rounds.map((r) => `${r.id}:${r.status}`).join(",") : "";
   const seatKey = state ? state.seats.map((s) => s.id).join(",") : "";
   const limits = useLimits(id, `${roundKey}|${seatKey}`);
+  const modelList = useModels();
 
   // Keep the sidebar's live / minutes badges in step with rounds starting and ending.
   // biome-ignore lint/correctness/useExhaustiveDependencies: roundKey is the trigger
@@ -61,6 +64,8 @@ export function MeetingRoom({ id }: { id: string }) {
       id,
       state,
       limits,
+      models: new Map((modelList?.models ?? []).map((m) => [m.id, m])),
+      standardContextBudget: modelList?.standardContextBudget ?? null,
       thinking: live.thinking,
       running,
       seatById,
@@ -68,9 +73,11 @@ export function MeetingRoom({ id }: { id: string }) {
       act,
       openReply: setReplyTarget,
       openWrapUp: () => setWrapOpen(true),
+      openBrief: (draft?: string) =>
+        setBriefDraft(draft ?? briefAt(state.messages, state.meeting.clock)),
       openEditSeat: setEditSeat,
     };
-  }, [id, state, limits, live.thinking, running, act]);
+  }, [id, state, limits, modelList, live.thinking, running, act]);
 
   // Stay pinned to the newest message while the chair is at the bottom; don't yank them back if they scrolled up.
   const scroller = useRef<HTMLDivElement>(null);
@@ -154,6 +161,7 @@ export function MeetingRoom({ id }: { id: string }) {
       <ReplyDialog target={replyTarget} onClose={() => setReplyTarget(null)} />
       <WrapUpDialog open={wrapOpen} onClose={() => setWrapOpen(false)} />
       <EditSeatDialog seat={editSeat} onClose={() => setEditSeat(null)} />
+      <BriefDialog draft={briefDraft} onClose={() => setBriefDraft(null)} />
     </RoomContext.Provider>
   );
 }

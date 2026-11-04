@@ -15,6 +15,8 @@ export interface IntroInput {
   /** Every current seat, the speaker included, in seat order. */
   roster: RosterEntry[];
   answerLength: AnswerLength;
+  /** The meeting brief at this turn's cutoff (ADR 0015); empty when there is none. */
+  brief?: string;
 }
 
 const LENGTH_RULE: Record<AnswerLength, string> = {
@@ -32,6 +34,13 @@ export function renderIntro(input: IntroInput): string {
     "A human, the Chair, runs the meeting.",
     "",
     `Meeting: ${input.meetingTitle}`,
+    ...(input.brief?.trim()
+      ? [
+          "",
+          "Meeting brief from the Chair (background and facts for the whole meeting):",
+          input.brief.trim(),
+        ]
+      : []),
     "",
     "Participants:",
     "- Chair: the human who runs the meeting",
@@ -120,9 +129,17 @@ function excerpt(text: string): string {
 }
 
 /** The line that stands in for trimmed messages (ADR 0012). */
-export function trimmedNote(count: number): string {
-  return `(${count} older message${count === 1 ? "" : "s"} trimmed to fit the context window.)`;
+export function trimmedNote(count: number, beforeSummary = false): string {
+  const n = `${count} older message${count === 1 ? "" : "s"}`;
+  return beforeSummary
+    ? `(${n} trimmed; the summary below covers them.)`
+    : `(${n} trimmed to fit the context window.)`;
 }
+
+/** Where a brief version entered the record after the discussion started (ADR 0015). */
+export const BRIEF_UPDATED_NOTE =
+  "(The Chair updated the meeting brief. Your instructions have the current version.)";
+export const BRIEF_CLEARED_NOTE = "(The Chair cleared the meeting brief.)";
 
 /** Ends an answer the chair stopped and then kept, so no seat takes the cut-off text for a finished answer. */
 export const CUT_OFF_NOTE = "(The Chair stopped this answer here.)";

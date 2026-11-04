@@ -327,7 +327,6 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
 
     await call("PATCH", `/api/meetings/${id}`, { answerLength: "detailed" });
     await call("PATCH", `/api/meetings/${id}`, { answerLength: "detailed" });
-    await call("PATCH", `/api/meetings/${id}`, { defaultMode: "in_turn" });
     const events = async () =>
       ((await call("GET", `/api/meetings/${id}`)).body as MeetingState).messages
         .filter((m) => m.authorKind === "event")
@@ -336,7 +335,6 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
       "You added Claude Opus 5.5",
       "You added GPT-6 Luna",
       "You set answers to Detailed",
-      "You set new questions to go to everyone · in turn",
     ]);
 
     await call("POST", `/api/meetings/${id}/actions`, {
@@ -373,6 +371,113 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
       .messages.map((m) => m.content)
       .join("\n");
     expect(gptView).toContain("[Claude Opus 5.5, decision]: DECISION: B");
+  });
+
+  it("lets a seat have its own answer length, and records each change", async () => {
+    const { call } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "Lengths" })).body.id as string;
+    const scribe = (
+      await call("POST", `/api/meetings/${id}/seats`, {
+        model: "deepseek-v4-pro",
+        displayName: "Scribe",
+        answerLength: "detailed",
+      })
+    ).body as Seat;
+    const plain = (await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" }))
+      .body as Seat;
+    expect(scribe.answerLength).toBe("detailed");
+    expect(plain.answerLength).toBeNull();
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("| Scribe | `deepseek-v4-pro` | DeepSeek · prepaid | answers: detailed |");
+
+    await call("PATCH", `/api/meetings/${id}/seats/${plain.id}`, { answerLength: "concise" });
+    await call("PATCH", `/api/meetings/${id}/seats/${plain.id}`, { answerLength: "concise" });
+    const reset = await call("PATCH", `/api/meetings/${id}/seats/${scribe.id}`, {
+      answerLength: null,
+    });
+    expect(reset.body.answerLength).toBeNull();
+    expect(
+      (await call("PATCH", `/api/meetings/${id}/seats/${plain.id}`, { answerLength: "long" }))
+        .status,
+    ).toBe(400);
+
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.messages.filter((m) => m.authorKind === "event").map((m) => m.content)).toEqual([
+      "You added Scribe",
+      "You added GPT-6 Luna",
+      "You set GPT-6 Luna's answers to Concise",
+      "You set Scribe's answers back to the room rule",
+    ]);
+  });
+
+  it("lets a seat pick a context budget, records changes, and lists the Standard size", async () => {
+    const { call } = setup();
+    expect((await call("GET", "/api/models")).body.standardContextBudget).toBe(120_000);
+    const id = (await call("POST", "/api/meetings", { title: "Budgets" })).body.id as string;
+    const seat = (
+      await call("POST", `/api/meetings/${id}/seats`, {
+        model: "claude-opus-5-5",
+        contextBudget: "large",
+      })
+    ).body as Seat;
+    expect(seat.contextBudget).toBe("large");
+    expect((await call("GET", `/api/meetings/${id}/export.md`)).text).toContain("context: large");
+
+    await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, { contextBudget: "full" });
+    await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, { contextBudget: null });
+    // Standard and "not set" are the same budget: no event line for switching between them.
+    await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, { contextBudget: "standard" });
+    expect(
+      (await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, { contextBudget: "huge" }))
+        .status,
+    ).toBe(400);
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.messages.filter((m) => m.authorKind === "event").map((m) => m.content)).toEqual([
+      "You added Claude Opus 5.5",
+      "You set Claude Opus 5.5's context budget to Full",
+      "You set Claude Opus 5.5's context budget to Standard",
+    ]);
+  });
+
+  it("sets the brief at creation and later, refuses an oversized one, and exports it", async () => {
+    const { call } = setup();
+    const id = (
+      await call("POST", "/api/meetings", { title: "Briefed", brief: "One node, no backups." })
+    ).body.id as string;
+    let state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    const first = state.messages.find((m) => m.authorKind === "brief")!;
+    expect(first).toMatchObject({ content: "One node, no backups.", visibleSeq: 1 });
+    expect(state.meeting.clock).toBe(1);
+
+    expect(
+      (await call("PUT", `/api/meetings/${id}/brief`, { content: "One node, no backups." })).body,
+    ).toMatchObject({ changed: false });
+    expect(
+      (await call("PUT", `/api/meetings/${id}/brief`, { content: "x".repeat(12_001) })).status,
+    ).toBe(400);
+    const updated = await call("PUT", `/api/meetings/${id}/brief`, { content: "Two nodes now." });
+    expect(updated.body).toMatchObject({
+      changed: true,
+      message: { authorKind: "brief", visibleSeq: 2 },
+    });
+
+    const seat = (await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" }))
+      .body as Seat;
+    const reply = await call("POST", `/api/meetings/${id}/actions`, {
+      text: "",
+      mode: "blind",
+      targets: [seat.id],
+      replyTo: first.id,
+    });
+    expect(reply.status).toBe(400);
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("## Meeting brief\n\nTwo nodes now.");
+    expect(md).toContain("_You set the meeting brief:_\n\n> One node, no backups.");
+    expect(md).toContain("_You updated the meeting brief:_\n\n> Two nodes now.");
+    state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.meeting.clock).toBe(2);
   });
 
   it("deletes a meeting", async () => {

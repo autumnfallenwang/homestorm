@@ -59,11 +59,18 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export interface ModelsResponse {
   models: ModelInfo[];
   families: Partial<Record<Source, Limits | null>>;
+  /** The Standard context budget (the server's VIEW_TOKEN_BUDGET). */
+  standardContextBudget: number;
 }
 
 export const api = {
   listMeetings: () => request<MeetingSummary[]>("GET", "/api/meetings"),
-  createMeeting: (title: string) => request<Meeting>("POST", "/api/meetings", { title }),
+  createMeeting: (title: string, brief?: string) =>
+    request<Meeting>("POST", "/api/meetings", { title, ...(brief?.trim() ? { brief } : {}) }),
+  setBrief: (id: string, content: string) =>
+    request<{ changed: boolean; message: Message | null }>("PUT", `/api/meetings/${id}/brief`, {
+      content,
+    }),
   getMeeting: (id: string) => request<MeetingState>("GET", `/api/meetings/${id}`),
   updateMeeting: (id: string, patch: UpdateMeetingInput) =>
     request<Meeting>("PATCH", `/api/meetings/${id}`, patch),

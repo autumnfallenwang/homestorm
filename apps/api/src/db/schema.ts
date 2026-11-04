@@ -81,8 +81,7 @@ export const meetings = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     title: text().notNull(),
-    // Room rules: where new questions go, and how long answers should be.
-    defaultMode: text().notNull().default("blind"),
+    // Room rule: how long answers should be (ADR 0012). Blind or in turn is chosen per message, in the message box.
     answerLength: text().notNull().default("concise"),
     // Logical clock: +1 each time a message enters the shared record. A seat's turn sees messages whose
     // visible_seq <= the clock when the turn started (the visibility rule, ADR 0005).
@@ -90,10 +89,7 @@ export const meetings = pgTable(
     createdAt: createdAt(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    check("meetings_default_mode_valid", sql`${t.defaultMode} IN ('blind', 'in_turn')`),
-    check("meetings_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`),
-  ],
+  (t) => [check("meetings_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`)],
 );
 
 export const seats = pgTable(
@@ -111,6 +107,10 @@ export const seats = pgTable(
     position: integer().notNull(),
     muted: boolean().notNull().default(false),
     reasoningEffort: text().notNull().default("low"),
+    // This seat's own answer length; null follows the meeting's room rule (ADR 0012).
+    answerLength: text(),
+    // How much of the meeting its view may hold: small / standard / large / full; null is standard (ADR 0012).
+    contextBudget: text(),
     // Removed seats stay, so their earlier messages keep a name in every view.
     removedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
@@ -119,6 +119,11 @@ export const seats = pgTable(
     index("seats_meeting_idx").on(t.meetingId, t.position),
     check("seats_owned_by_valid", sql`${t.ownedBy} IN ('anthropic', 'openai-codex', 'deepseek')`),
     check("seats_reasoning_effort_valid", sql`${t.reasoningEffort} IN ('low', 'medium', 'high')`),
+    check("seats_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`),
+    check(
+      "seats_context_budget_valid",
+      sql`${t.contextBudget} IN ('small', 'standard', 'large', 'full')`,
+    ),
   ],
 );
 
@@ -182,6 +187,8 @@ export const messages = pgTable(
     llmgwReqId: text(),
     requestId: text(),
     trimmedCount: integer().notNull().default(0),
+    // The view's size by the budget estimate when the turn started.
+    viewTokens: integer(),
     stoppedEarly: boolean().notNull().default(false),
     createdAt: createdAt(),
     startedAt: timestamp({ withTimezone: true }),
@@ -190,7 +197,10 @@ export const messages = pgTable(
   (t) => [
     index("messages_meeting_seq_idx").on(t.meetingId, t.seq),
     index("messages_round_idx").on(t.roundId),
-    check("messages_author_kind_valid", sql`${t.authorKind} IN ('chair', 'seat', 'event')`),
+    check(
+      "messages_author_kind_valid",
+      sql`${t.authorKind} IN ('chair', 'seat', 'event', 'brief')`,
+    ),
     check(
       "messages_status_valid",
       sql`${t.status} IN ('queued', 'streaming', 'done', 'stopped', 'error', 'skipped')`,

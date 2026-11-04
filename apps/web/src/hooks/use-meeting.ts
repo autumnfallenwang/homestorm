@@ -3,7 +3,7 @@
 import type { Limits, MeetingEvent } from "@homestorm/shared";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, type ModelsResponse } from "@/lib/api";
 import { applyEvent, emptyLive, type LiveState } from "@/lib/meeting-state";
 
 export type Connection = "connecting" | "live" | "reconnecting" | "not-found";
@@ -92,4 +92,15 @@ export function useLimits(id: string, refreshKey: string) {
   }, [refreshKey, load]);
 
   return limits;
+}
+
+/** llmgw's models (context windows, output limits) and the Standard context budget, for seat budgets. */
+export function useModels() {
+  const [data, setData] = useState<ModelsResponse | null>(null);
+  useEffect(() => {
+    api.listModels().then(setData, () => {
+      // Without it, the seat cards just leave out the context line.
+    });
+  }, []);
+  return data;
 }

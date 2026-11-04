@@ -12,6 +12,7 @@ import {
   sentToLine,
 } from "./format";
 import { applyEvent, emptyLive, type LiveState } from "./meeting-state";
+import { percentLabel, seatContext } from "./seat-context";
 
 const msg = (extra: Partial<Message>): Message => ({
   id: "m1",
@@ -38,6 +39,7 @@ const msg = (extra: Partial<Message>): Message => ({
   llmgwReqId: null,
   requestId: null,
   trimmedCount: 0,
+  viewTokens: null,
   stoppedEarly: false,
   createdAt: "2026-11-02T00:00:00.000Z",
   startedAt: null,
@@ -49,7 +51,6 @@ const state = (messages: Message[]): MeetingState => ({
   meeting: {
     id: "x",
     title: "T",
-    defaultMode: "blind",
     answerLength: "concise",
     clock: 0,
     createdAt: "",
@@ -66,6 +67,8 @@ const state = (messages: Message[]): MeetingState => ({
       position: 0,
       muted: false,
       reasoningEffort: "low",
+      answerLength: null,
+      contextBudget: null,
       removedAt: null,
       createdAt: "",
     },
@@ -285,5 +288,46 @@ describe("format", () => {
       "gpt-6-luna",
       "gpt-5.6-luna",
     ]);
+  });
+});
+
+describe("seatContext", () => {
+  const models = new Map([
+    [
+      "claude-opus-5-5",
+      {
+        id: "claude-opus-5-5",
+        ownedBy: "anthropic" as const,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        available: true,
+        statusDetail: null,
+      },
+    ],
+  ]);
+  const turn = (viewTokens: number, trimmedCount = 0) =>
+    msg({ seatId: "s1", authorKind: "seat", viewTokens, trimmedCount });
+
+  it("measures the last view against the seat's budget, amber from 80%, then trimming", () => {
+    const seat = state([]).seats[0]!;
+    expect(seatContext(seat, state([]), models, 120_000)).toMatchObject({
+      budget: 120_000,
+      last: null,
+      tone: "ok",
+    });
+    expect(seatContext(seat, state([turn(60_000)]), models, 120_000)).toMatchObject({
+      percent: 50,
+      window: 1_000_000,
+      tone: "ok",
+    });
+    expect(percentLabel(50)).toBe("50%");
+    expect(percentLabel(0.4)).toBe("<1%");
+    expect(seatContext(seat, state([turn(100_000)]), models, 120_000).tone).toBe("warn");
+    expect(seatContext(seat, state([turn(100_000, 3)]), models, 120_000).tone).toBe("trimming");
+    const small = { ...seat, contextBudget: "small" as const };
+    expect(seatContext(small, state([turn(27_000)]), models, 120_000)).toMatchObject({
+      budget: 32_000,
+      tone: "warn",
+    });
   });
 });

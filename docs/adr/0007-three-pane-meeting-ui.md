@@ -22,7 +22,8 @@ user reviewed and approved a mockup ("looking perfect"). The mockup itself is ke
   - **Message box:** the send-to selector (default *Everyone · blind*), @mentions, Stop all and Send.
 - **Right: seats panel**, always visible.
   - One card per seat: model, source, status, allowance bar, and Ask / Mute / ⋯.
-  - A Room rules box at the bottom.
+  - A Room rules box at the bottom: answer length, and the two fixed rules. (It also had "New questions go to"
+    until 2026-11-03; that duplicated the message box's selector, so it was removed.)
 - **Dialogs and menus:** send-to menu, @mention list, reply-to picker, add seat (grouped by source, with "Not on your
   plan"), seat menu, wrap up.
 - **Problems stay visible in place:** rate limited, stopped, out of allowance.

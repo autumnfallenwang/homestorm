@@ -1,12 +1,16 @@
 "use client";
 
-import type { Limits, MeetingState, Message, Seat } from "@homestorm/shared";
+import type { Limits, MeetingState, Message, ModelInfo, Seat } from "@homestorm/shared";
 import { createContext, useContext } from "react";
 
 export interface Room {
   id: string;
   state: MeetingState;
   limits: Record<string, Limits | null>;
+  /** llmgw's models by ID, for context windows; empty until loaded. */
+  models: Map<string, ModelInfo>;
+  /** The Standard context budget; null until the model list has loaded. */
+  standardContextBudget: number | null;
   thinking: Record<string, number>;
   /** A round is running: new questions wait. */
   running: boolean;
@@ -16,6 +20,8 @@ export interface Room {
   act: (fn: () => Promise<unknown>) => Promise<boolean>;
   openReply: (target: Message) => void;
   openWrapUp: () => void;
+  /** Open the brief editor, optionally pre-filled (e.g. a wrap-up to copy in). */
+  openBrief: (draft?: string) => void;
   openEditSeat: (seat: Seat) => void;
 }
 

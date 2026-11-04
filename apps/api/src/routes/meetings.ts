@@ -2,10 +2,11 @@
 //
 //   GET    /api/models                                 llmgw's chat models for the three sources, with each family's allowance
 //   GET    /api/meetings                               meetings list
-//   POST   /api/meetings                               create { title }
+//   POST   /api/meetings                               create { title, brief? }
 //   GET    /api/meetings/:id                           the whole meeting (MeetingState)
-//   PATCH  /api/meetings/:id                           rename, room rules (a rule change adds an event line)
+//   PATCH  /api/meetings/:id                           rename, answer length (a change adds an event line)
 //   DELETE /api/meetings/:id
+//   PUT    /api/meetings/:id/brief                     set, change or clear the meeting brief { content }
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
 //   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort? }
@@ -20,12 +21,15 @@
 
 import {
   AddSeatInput,
+  type AnswerLength,
+  type ContextBudget,
   CreateMeetingInput,
   type Limits,
   type MeetingEvent,
   MoveSeatInput,
   prettyModelName,
   SendActionInput,
+  SetBriefInput,
   type Source,
   StopInput,
   seatNameClash,
@@ -69,6 +73,14 @@ function fail(c: Ctx, err: unknown): Response {
   throw err;
 }
 
+const LENGTH_LABEL: Record<AnswerLength, string> = { concise: "Concise", detailed: "Detailed" };
+const BUDGET_LABEL: Record<ContextBudget, string> = {
+  small: "Small",
+  standard: "Standard",
+  large: "Large",
+  full: "Full",
+};
+
 export function meetingRoutes(deps: MeetingDeps) {
   const { engine, store, llm, hub } = deps;
   const app = new Hono<{ Variables: AuthVariables }>();
@@ -82,7 +94,7 @@ export function meetingRoutes(deps: MeetingDeps) {
         const sample = models.find((m) => m.ownedBy === source && m.available);
         families[source] = sample ? await llm.limits(sample.id) : null;
       }
-      return c.json({ models, families });
+      return c.json({ models, families, standardContextBudget: engine.standardContextBudget });
     } catch (err) {
       log.warn({ event: "llmgw.models_failed", err }, "could not list models");
       return c.json({ error: "Couldn't reach llmgw to list models." }, 502);
@@ -95,7 +107,21 @@ export function meetingRoutes(deps: MeetingDeps) {
   app.post("/meetings", async (c) => {
     const input = await parse(c, CreateMeetingInput);
     if (input instanceof Response) return input;
-    return c.json(await store.createMeeting(input.title), 201);
+    const meeting = await store.createMeeting(input.title);
+    if (input.brief?.trim()) await engine.setBrief(meeting.id, input.brief);
+    return c.json((await store.getMeeting(meeting.id)) ?? meeting, 201);
+  });
+
+  // The meeting brief (ADR 0015): standing context every seat always sees. Empty clears it.
+  app.put("/meetings/:id/brief", async (c) => {
+    const input = await parse(c, SetBriefInput);
+    if (input instanceof Response) return input;
+    try {
+      const message = await engine.setBrief(c.req.param("id"), input.content);
+      return c.json({ changed: !!message, message });
+    } catch (err) {
+      return fail(c, err);
+    }
   });
 
   app.get("/meetings/:id", async (c) => {
@@ -111,18 +137,9 @@ export function meetingRoutes(deps: MeetingDeps) {
     const meeting = await store.updateMeeting(before.id, input);
     if (!meeting) return c.json({ error: "Not found" }, 404);
     engine.emit(meeting.id, { type: "meeting", meeting });
-    // Room rules shape every later turn, so the transcript and the export record when they changed.
+    // The room rule shapes every later turn, so the transcript and the export record when it changed.
     if (meeting.answerLength !== before.answerLength) {
-      await engine.addEvent(
-        meeting.id,
-        `You set answers to ${meeting.answerLength === "detailed" ? "Detailed" : "Concise"}`,
-      );
-    }
-    if (meeting.defaultMode !== before.defaultMode) {
-      await engine.addEvent(
-        meeting.id,
-        `You set new questions to go to everyone · ${meeting.defaultMode === "in_turn" ? "in turn" : "blind"}`,
-      );
+      await engine.addEvent(meeting.id, `You set answers to ${LENGTH_LABEL[meeting.answerLength]}`);
     }
     return c.json(meeting);
   });
@@ -234,6 +251,8 @@ export function meetingRoutes(deps: MeetingDeps) {
         ),
       persona: input.persona?.trim() || null,
       reasoningEffort: input.reasoningEffort ?? "low",
+      answerLength: input.answerLength ?? null,
+      contextBudget: input.contextBudget ?? null,
     });
     engine.emit(id, { type: "seat", seat });
     await engine.addEvent(id, `You added ${seat.displayName}`);
@@ -260,6 +279,25 @@ export function meetingRoutes(deps: MeetingDeps) {
     }
     if (input.displayName && input.displayName !== before.displayName) {
       await engine.addEvent(id, `You renamed ${before.displayName} to ${seat.displayName}`);
+    }
+    // Like the room rule, a seat's answer length and context budget shape its later turns, so the transcript
+    // records each change.
+    if (input.answerLength !== undefined && input.answerLength !== before.answerLength) {
+      await engine.addEvent(
+        id,
+        seat.answerLength
+          ? `You set ${seat.displayName}'s answers to ${LENGTH_LABEL[seat.answerLength]}`
+          : `You set ${seat.displayName}'s answers back to the room rule`,
+      );
+    }
+    if (
+      input.contextBudget !== undefined &&
+      (input.contextBudget ?? "standard") !== (before.contextBudget ?? "standard")
+    ) {
+      await engine.addEvent(
+        id,
+        `You set ${seat.displayName}'s context budget to ${BUDGET_LABEL[seat.contextBudget ?? "standard"]}`,
+      );
     }
     return c.json(seat);
   });

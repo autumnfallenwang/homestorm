@@ -10,11 +10,22 @@
 //    only part that changes from turn to turn, goes last.
 // 6. Visibility (ADR 0005): a seat sees the messages that entered the record before its turn started
 //    (visible_seq <= cutoff_seq). Comments ("events"), unfinished answers and unposted minutes are never shown.
-// 7. Long meetings (ADR 0012): over budget, the oldest messages are dropped, but the first chair message stays.
+// 7. Long meetings (ADR 0015): over budget, turns are dropped from the middle. Never dropped: the intro (with the
+//    meeting brief), the first chair message, the latest posted wrap-up, the newest message and the floor note.
+//    Turns before that wrap-up go first, since it summarizes them.
 // 8. An answer the chair stopped and kept ends with a note saying so, so it isn't read as a finished answer.
 
-import type { AnswerLength, Message, Seat, WrapKind } from "@homestorm/shared";
 import {
+  type AnswerLength,
+  briefAt,
+  type Message,
+  type Seat,
+  seatAnswerLength,
+  type WrapKind,
+} from "@homestorm/shared";
+import {
+  BRIEF_CLEARED_NOTE,
+  BRIEF_UPDATED_NOTE,
   CUT_OFF_NOTE,
   type Floor,
   MEETING_STARTED,
@@ -65,10 +76,12 @@ interface Item {
   role: "user" | "assistant";
   content: string;
   isChair: boolean;
+  /** A posted wrap-up: the latest one is kept when trimming (ADR 0015). */
+  isSummary: boolean;
 }
 
-/** Messages a seat may see at a cutoff, in the order they entered the shared record. */
-export function visibleMessages(messages: Message[], cutoffSeq: number): Message[] {
+/** The shared record at a cutoff, brief versions included, in the order things entered it. */
+function recordAt(messages: Message[], cutoffSeq: number): Message[] {
   return messages
     .filter(
       (m) =>
@@ -76,10 +89,16 @@ export function visibleMessages(messages: Message[], cutoffSeq: number): Message
         m.visibleSeq <= cutoffSeq &&
         m.status === "done" &&
         m.authorKind !== "event" &&
-        !m.hiddenFromSeats &&
-        m.content.trim() !== "",
+        !m.hiddenFromSeats,
     )
     .sort((a, b) => (a.visibleSeq ?? 0) - (b.visibleSeq ?? 0) || a.seq - b.seq);
+}
+
+/** Messages a seat may see at a cutoff, in the order they entered the shared record. Brief versions aren't messages. */
+export function visibleMessages(messages: Message[], cutoffSeq: number): Message[] {
+  return recordAt(messages, cutoffSeq).filter(
+    (m) => m.authorKind !== "brief" && m.content.trim() !== "",
+  );
 }
 
 export function buildView(input: ViewInput): View {
@@ -98,21 +117,38 @@ export function buildView(input: ViewInput): View {
     meetingTitle: input.meeting.title,
     self: { displayName: seat.displayName, model: seat.model, persona: seat.persona },
     roster,
-    answerLength: input.meeting.answerLength,
+    answerLength: seatAnswerLength(seat, input.meeting),
+    brief: briefAt(messages, input.cutoffSeq),
   });
   const floor = renderFloorNote(input.floor);
 
-  const items: Item[] = visibleMessages(messages, input.cutoffSeq).map((m) => {
-    const content = m.stoppedEarly ? `${m.content}\n\n${CUT_OFF_NOTE}` : m.content;
-    if (m.authorKind === "seat" && m.seatId === seat.id) {
-      return { role: "assistant", content, isChair: false };
+  const items: Item[] = [];
+  for (const m of recordAt(messages, input.cutoffSeq)) {
+    if (m.authorKind === "brief") {
+      // The brief itself is in the intro. Once the discussion has started, a change leaves a line where it happened.
+      if (items.length)
+        items.push({
+          role: "user",
+          content: m.content.trim() ? BRIEF_UPDATED_NOTE : BRIEF_CLEARED_NOTE,
+          isChair: false,
+          isSummary: false,
+        });
+      continue;
     }
-    return {
+    if (!m.content.trim()) continue;
+    const content = m.stoppedEarly ? `${m.content}\n\n${CUT_OFF_NOTE}` : m.content;
+    const isSummary = m.authorKind === "seat" && !!m.wrapKind;
+    if (m.authorKind === "seat" && m.seatId === seat.id) {
+      items.push({ role: "assistant", content, isChair: false, isSummary });
+      continue;
+    }
+    items.push({
       role: "user",
       content: `${speakerTag(m)}: ${content}`,
       isChair: m.authorKind === "chair",
-    };
-  });
+      isSummary,
+    });
+  }
 
   function speakerTag(m: Message): string {
     let tag = authorOf(m);
@@ -149,34 +185,57 @@ function cost(text: string): number {
 }
 
 /**
- * Keep the newest items that fit, plus the first chair message (the original question). The dropped ones in between
- * become a single "(N older messages trimmed)" line.
+ * Drop turns from the middle until the view fits (ADR 0015). Always kept: everything up to the first chair message
+ * (the original question), the latest posted wrap-up, and the newest item, even alone over budget: it's what's being
+ * answered. Turns before the wrap-up go first, since it summarizes them; then the oldest after it. Each run of
+ * dropped turns becomes one "(N older messages trimmed)" line.
  */
 function fitToBudget(items: Item[], budget: number): { kept: Item[]; trimmedCount: number } {
-  const total = items.reduce((n, it) => n + cost(it.content), 0);
-  if (total <= budget) return { kept: items, trimmedCount: 0 };
+  let size = items.reduce((n, it) => n + cost(it.content), 0);
+  if (size <= budget) return { kept: items, trimmedCount: 0 };
 
-  const anchorIndex = items.findIndex((it) => it.isChair);
-  const anchor = anchorIndex >= 0 ? items[anchorIndex] : undefined;
-  let room = budget - (anchor ? cost(anchor.content) : 0) - cost(trimmedNote(999));
-
-  // Walk back from the newest. The newest item always stays, even alone over budget: it's what's being answered.
-  let firstKept = items.length;
-  for (let i = items.length - 1; i > anchorIndex; i--) {
-    const c = cost((items[i] as Item).content);
-    if (room - c < 0 && i < items.length - 1) break;
-    room -= c;
-    firstKept = i;
+  const first = items.findIndex((it) => it.isChair);
+  const last = items.length - 1;
+  let summary = -1;
+  for (let i = last; i > first; i--) {
+    if (items[i]?.isSummary) {
+      summary = i;
+      break;
+    }
   }
-  if (firstKept <= anchorIndex + 1) return { kept: items, trimmedCount: 0 };
+  const order: number[] = [];
+  if (summary > first) for (let i = first + 1; i < summary; i++) order.push(i);
+  for (let i = Math.max(first, summary) + 1; i < last; i++) order.push(i);
 
-  const dropped = firstKept - (anchorIndex + 1);
-  const kept: Item[] = [
-    ...items.slice(0, anchorIndex + 1),
-    { role: "user", content: trimmedNote(dropped), isChair: false },
-    ...items.slice(firstKept),
-  ];
-  return { kept, trimmedCount: dropped };
+  // Room for the trim lines: at most one before the summary and one after it.
+  size += 2 * cost(trimmedNote(999, true));
+  const dropped = new Set<number>();
+  for (const i of order) {
+    if (size <= budget) break;
+    dropped.add(i);
+    size -= cost((items[i] as Item).content);
+  }
+  if (!dropped.size) return { kept: items, trimmedCount: 0 };
+
+  const kept: Item[] = [];
+  let run = 0;
+  items.forEach((it, i) => {
+    if (dropped.has(i)) {
+      run++;
+      return;
+    }
+    if (run) {
+      kept.push({
+        role: "user",
+        content: trimmedNote(run, i === summary),
+        isChair: false,
+        isSummary: false,
+      });
+      run = 0;
+    }
+    kept.push(it);
+  });
+  return { kept, trimmedCount: dropped.size };
 }
 
 function merge(items: Item[]): ChatMessage[] {

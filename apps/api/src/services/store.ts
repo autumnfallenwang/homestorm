@@ -4,6 +4,7 @@
 import type {
   AnswerLength,
   AuthorKind,
+  ContextBudget,
   Meeting,
   MeetingState,
   MeetingSummary,
@@ -35,7 +36,6 @@ export function toMeeting(r: MeetingRow): Meeting {
   return {
     id: r.id,
     title: r.title,
-    defaultMode: r.defaultMode as Meeting["defaultMode"],
     answerLength: r.answerLength as AnswerLength,
     clock: r.clock,
     createdAt: r.createdAt.toISOString(),
@@ -54,6 +54,8 @@ export function toSeat(r: SeatRow): Seat {
     position: r.position,
     muted: r.muted,
     reasoningEffort: r.reasoningEffort as ReasoningEffort,
+    answerLength: r.answerLength as AnswerLength | null,
+    contextBudget: r.contextBudget as ContextBudget | null,
     removedAt: iso(r.removedAt),
     createdAt: r.createdAt.toISOString(),
   };
@@ -101,6 +103,7 @@ export function toMessage(r: MessageRow): Message {
     llmgwReqId: r.llmgwReqId,
     requestId: r.requestId,
     trimmedCount: r.trimmedCount,
+    viewTokens: r.viewTokens,
     stoppedEarly: r.stoppedEarly,
     createdAt: r.createdAt.toISOString(),
     startedAt: iso(r.startedAt),
@@ -145,7 +148,7 @@ export function createStore(db: Database) {
 
     async updateMeeting(
       id: string,
-      patch: Partial<Pick<MeetingRow, "title" | "defaultMode" | "answerLength">>,
+      patch: Partial<Pick<MeetingRow, "title" | "answerLength">>,
     ): Promise<Meeting | null> {
       const [row] = await db
         .update(meetings)
@@ -206,6 +209,8 @@ export function createStore(db: Database) {
       displayName: string;
       persona: string | null;
       reasoningEffort: ReasoningEffort;
+      answerLength?: AnswerLength | null;
+      contextBudget?: ContextBudget | null;
     }): Promise<Seat> {
       const [max] = await db
         .select({ value: sql<number>`coalesce(max(${seats.position}), -1)::int` })
@@ -250,7 +255,14 @@ export function createStore(db: Database) {
       patch: Partial<
         Pick<
           SeatRow,
-          "displayName" | "persona" | "muted" | "reasoningEffort" | "position" | "removedAt"
+          | "displayName"
+          | "persona"
+          | "muted"
+          | "reasoningEffort"
+          | "answerLength"
+          | "contextBudget"
+          | "position"
+          | "removedAt"
         >
       >,
     ): Promise<Seat> {

@@ -134,3 +134,33 @@ cluster.
   V4 Pro through the browser)
 
 v1 is done. Next candidates are in "Out (later)" above.
+
+## Future work
+
+### M9: Tools through mcpgw (waits for mcpgw) ⏸
+
+Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw**, the home cluster's tool gateway
+(design: `~/agentic/mcpgw/docs/design.md`); homestorm runs the tool loop. A fake-MCP-server test against the real
+llmgw already showed all three families choosing to search, writing their own queries, and answering from the
+result (`~/agentic/mcpgw/dev/tool-loop-demo/`).
+
+- [ ] **Prerequisite:** mcpgw built and deployed (`web_search` via SearXNG, `web_fetch`), at `mcpgw.arch.internal`
+- [ ] **The date in the intro:** "Today is …; your training data may be older." No mcpgw needed, so it can go first
+- [ ] **Chair search:** a "Search the web" action in the message box; homestorm calls mcpgw's `web_search` and posts
+  the results as one "Sources" message every seat sees
+- [ ] **Seat tools:**
+  - a seat setting "Can search the web";
+  - the tool loop in the engine, with a per-turn call limit;
+  - "Searched: … · Read: …" under the answer, and the sources in the record;
+  - a "must search" option (`tool_choice: required`)
+- [ ] **Check first:** streaming `tool_calls` through llmgw (the demo used non-streaming calls)
+- [ ] **Tests:** a fake MCP server next to `FakeLlm`, seeded from the demo
+
+### Done after v1: the meeting brief and the full-context policy ✅
+
+- [x] Meeting brief: optional at creation, editable any time, on the meeting clock, never trimmed
+  ([ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md))
+- [x] Over budget: keep the intro, the first question, the latest posted wrap-up and the newest turns; drop the
+  turns before the wrap-up first
+- [x] Copy a posted wrap-up into the brief; the seat card turns amber at 80% and shows "Trimming older turns"; the
+  message box suggests minutes

@@ -1,6 +1,9 @@
 "use client";
 
 import {
+  type AnswerLength,
+  type ContextBudget,
+  maxOutputTokens,
   type ReasoningEffort,
   type Seat,
   seatNameClash,
@@ -28,14 +31,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { AnswerLengthSelect } from "./answer-length-select";
+import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 
-/** Edit name, persona and thinking effort. The model can't change: that would be a different seat. */
+/** Edit name, persona, thinking effort, answer length and context budget. The model can't change: that would be a different seat. */
 export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: () => void }) {
-  const { id, state, act } = useRoom();
+  const { id, state, act, models, standardContextBudget } = useRoom();
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
+  const [length, setLength] = useState<AnswerLength | null>(null);
+  const [budget, setBudget] = useState<ContextBudget | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -43,10 +50,13 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
       setName(seat.displayName);
       setPersona(seat.persona ?? "");
       setEffort(seat.reasoningEffort);
+      setLength(seat.answerLength);
+      setBudget(seat.contextBudget);
     }
   }, [seat]);
 
   const clash = seat && name.trim() ? seatNameClash(name, state.seats, seat.id) : undefined;
+  const info = seat ? models.get(seat.model) : undefined;
 
   async function save() {
     if (!seat || !name.trim() || clash) return;
@@ -56,6 +66,8 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
         displayName: name.trim(),
         persona: persona.trim() || null,
         reasoningEffort: effort,
+        answerLength: length,
+        contextBudget: budget,
       }),
     );
     setBusy(false);
@@ -111,6 +123,22 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
               </SelectContent>
             </Select>
           </div>
+          <AnswerLengthSelect
+            value={length}
+            onChange={setLength}
+            roomRule={state.meeting.answerLength}
+          />
+          <ContextBudgetSelect
+            value={budget}
+            onChange={setBudget}
+            contextWindow={info?.contextWindow ?? null}
+            outputCap={maxOutputTokens(
+              length ?? state.meeting.answerLength,
+              effort,
+              info?.maxTokens ?? null,
+            )}
+            standard={standardContextBudget}
+          />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

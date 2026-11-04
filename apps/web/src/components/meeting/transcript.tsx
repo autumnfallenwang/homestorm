@@ -1,13 +1,23 @@
 "use client";
 
 import { type Message, type Round, stripSpeakerTag } from "@homestorm/shared";
-import { AlertTriangle, Check, Copy, CornerUpLeft, Loader2, RotateCcw, Square } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  CornerUpLeft,
+  FileText,
+  Loader2,
+  RotateCcw,
+  Square,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { clockTime, compactNumber, plainText, roundProgress, sentToLine } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { BriefCard, useCurrentBrief } from "./brief";
 import { Markdown } from "./markdown";
 import { useRoom } from "./room-context";
 import { SeatAvatar, SourceTag } from "./source";
@@ -46,31 +56,38 @@ export function transcriptItems(messages: Message[], rounds: Round[]): Item[] {
 export function Transcript() {
   const { state } = useRoom();
   const items = transcriptItems(state.messages, state.rounds);
-  if (!items.length) {
+  // Brief versions show as a line where they changed; an empty transcript still gets the welcome.
+  if (!items.some((it) => it.kind === "round" || it.message.authorKind !== "brief")) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">The floor is yours.</p>
-        <p className="mt-1">
-          Add seats on the right, then ask your question. By default everyone answers blind: each
-          seat answers without seeing the others.
-        </p>
+      <div className="mx-auto max-w-3xl px-4 py-6">
+        <BriefCard />
+        <div className="mx-auto max-w-md py-16 text-center text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">The floor is yours.</p>
+          <p className="mt-1">
+            Add seats on the right, then ask your question. By default everyone answers blind: each
+            seat answers without seeing the others.
+          </p>
+        </div>
       </div>
     );
   }
   return (
-    <ol className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6" aria-label="Transcript">
-      {items.map((it) =>
-        it.kind === "round" ? (
-          <li key={it.round.id}>
-            <RoundBox round={it.round} messages={it.messages} />
-          </li>
-        ) : (
-          <li key={it.message.id}>
-            <MessageItem message={it.message} />
-          </li>
-        ),
-      )}
-    </ol>
+    <div className="mx-auto max-w-3xl px-4 py-6">
+      <BriefCard />
+      <ol className="mt-4 flex flex-col gap-4" aria-label="Transcript">
+        {items.map((it) =>
+          it.kind === "round" ? (
+            <li key={it.round.id}>
+              <RoundBox round={it.round} messages={it.messages} />
+            </li>
+          ) : (
+            <li key={it.message.id}>
+              <MessageItem message={it.message} />
+            </li>
+          ),
+        )}
+      </ol>
+    </div>
   );
 }
 
@@ -113,6 +130,7 @@ function MessageItem({ message, inRound = false }: { message: Message; inRound?:
   if (message.authorKind === "event") {
     return <p className="text-center text-xs text-muted-foreground">{message.content}</p>;
   }
+  if (message.authorKind === "brief") return <BriefLine message={message} />;
   if (message.authorKind === "chair") return <ChairMessage message={message} />;
   return <SeatMessage message={message} inRound={inRound} />;
 }
@@ -298,9 +316,27 @@ function MetaLine({ message }: { message: Message }) {
 
 /** A wrap-up waits for the chair's review before the seats see it (ADR 0007). */
 function PostWrapUp({ message }: { message: Message }) {
-  const { id, act } = useRoom();
+  const { id, act, openBrief, seatName } = useRoom();
+  const current = useCurrentBrief();
   const [busy, setBusy] = useState(false);
-  if (!message.wrapKind || message.status !== "done" || !message.hiddenFromSeats) return null;
+  if (!message.wrapKind || message.status !== "done") return null;
+  if (!message.hiddenFromSeats) {
+    // A posted wrap-up can go into the brief, so it's never trimmed (ADR 0015). The chair edits it before saving.
+    const heading = `## ${WRAP_LABEL[message.wrapKind]} from ${seatName(message.seatId)}`;
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="mt-1 h-7 gap-1 px-2 text-xs text-muted-foreground"
+        onClick={() =>
+          openBrief(`${current}${current ? "\n\n" : ""}${heading}\n\n${message.content.trim()}`)
+        }
+      >
+        <FileText className="size-3.5" />
+        Copy into the brief
+      </Button>
+    );
+  }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border bg-muted/40 px-3 py-2">
       <p className="text-xs text-muted-foreground">
@@ -319,6 +355,42 @@ function PostWrapUp({ message }: { message: Message }) {
         {busy ? <Loader2 className="animate-spin" /> : <Check />}
         Post to the meeting
       </Button>
+    </div>
+  );
+}
+
+/** "You updated the meeting brief", with that version one click away (ADR 0015). */
+function BriefLine({ message }: { message: Message }) {
+  const { state } = useRoom();
+  const [open, setOpen] = useState(false);
+  const firstBrief = state.messages.find((m) => m.authorKind === "brief")?.id === message.id;
+  const text = !message.content
+    ? "You cleared the meeting brief"
+    : firstBrief
+      ? "You set the meeting brief"
+      : "You updated the meeting brief";
+  return (
+    <div className="text-center text-xs text-muted-foreground">
+      <p>
+        {text}
+        {message.content && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              className="underline-offset-2 hover:underline"
+              onClick={() => setOpen((o) => !o)}
+            >
+              {open ? "hide this version" : "show this version"}
+            </button>
+          </>
+        )}
+      </p>
+      {open && (
+        <p className="mx-auto mt-1.5 max-w-xl rounded-md border bg-muted/40 px-3 py-2 text-left whitespace-pre-wrap text-foreground">
+          {message.content}
+        </p>
+      )}
     </div>
   );
 }

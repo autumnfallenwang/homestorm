@@ -8,6 +8,34 @@
       "when": 1793671560341,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793730518147,
+      "tag": "0001_seat_answer_length",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793731221426,
+      "tag": "0002_drop_default_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793734002800,
+      "tag": "0003_seat_context_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793819686363,
+      "tag": "0004_brief_author_kind",
+      "breakpoints": true
     }
   ]
 }

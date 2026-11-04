@@ -1,0 +1,2 @@
+ALTER TABLE "messages" DROP CONSTRAINT "messages_author_kind_valid";--> statement-breakpoint
+ALTER TABLE "messages" ADD CONSTRAINT "messages_author_kind_valid" CHECK ("messages"."author_kind" IN ('chair', 'seat', 'event', 'brief'));

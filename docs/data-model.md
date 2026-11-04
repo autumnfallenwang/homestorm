@@ -9,10 +9,10 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 
 | Table | One row per | Key fields |
 |---|---|---|
-| `meetings` | meeting | `title`; room rules `default_mode` (blind / in turn) and `answer_length` (concise / detailed); `clock` |
-| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `removed_at` |
+| `meetings` | meeting | `title`; room rule `answer_length` (concise / detailed); `clock` |
+| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `removed_at` |
 | `rounds` | time the chair gives the floor | `number`, `mode` (blind / in_turn / single / wrap_up), `seat_ids` in answering order, `prompt_message_id`, `reply_to_id`, `wrap_kind`, `status` |
-| `messages` | transcript entry | `author_kind` (chair / seat / event), `seat_id`, `round_id`, `content`, `status`, `visible_seq`, `cutoff_seq`, tracing fields |
+| `messages` | transcript entry | `author_kind` (chair / seat / event / brief), `seat_id`, `round_id`, `content`, `status`, `visible_seq`, `cutoff_seq`, tracing fields |
 | `users`, `sessions`, `accounts`, `verifications` | Better Auth | the one admin login ([ADR 0011](adr/0011-one-admin-login.md)) |
 
 - **Removed seats are kept** (`removed_at`), so their earlier messages still have a name in every view. They leave
@@ -20,11 +20,17 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 - **Seat names are unique within a meeting,** ignoring case and counting removed seats, because every view tags
   messages by name. Several seats may use the same model: the default names are "Claude Opus 5.5", then
   "Claude Opus 5.5 (2)". The API refuses a taken name with 409 (`seatNameClash` in `packages/shared/src/names.ts`).
+- **The meeting brief** ([ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md)) is stored as messages with
+  `author_kind = 'brief'`, one per saved version, each with the next clock value. A turn's intro gets the latest
+  version with `visible_seq <= cutoff_seq` (`briefAt` in `packages/shared`), so blind rounds share one version and
+  Retry repeats it. A version saved after the discussion started leaves a one-line note at its place in later views.
+  At most 12,000 characters.
 - **Event lines** ("You muted Claude Sonnet 5.5 for rounds") are messages with `author_kind = 'event'`. Seats never
   see them. Room-rule changes ("You set answers to Detailed") and posting a wrap-up ("You posted Scribe's decision")
   add one too, so the transcript and the export show when they happened.
 - **Tracing fields** on seat messages: `model`, `owned_by`, `reasoning_effort`, `usage` (with an `estimated` flag),
-  `cost_usd`, `llmgw_req_id`, `request_id` (homestorm's, sent as `X-Request-Id`), `trimmed_count`, `started_at`,
+  `cost_usd`, `llmgw_req_id`, `request_id` (homestorm's, sent as `X-Request-Id`), `trimmed_count`, `view_tokens` (the
+  view's estimated size when the turn started), `started_at`,
   `finished_at` ([ADR 0009](adr/0009-first-version-scope.md)).
 
 ## Message statuses

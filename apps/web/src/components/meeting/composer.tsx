@@ -2,7 +2,7 @@
 
 import { canTakeFloor, type Seat } from "@homestorm/shared";
 import { AtSign, Check, ChevronDown, Loader2, SendHorizontal, Square, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { allowanceLine, listWords } from "@/lib/format";
+import { seatContext } from "@/lib/seat-context";
 import { cn } from "@/lib/utils";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
@@ -31,9 +32,10 @@ const MODE_LABEL: Record<Mode, string> = {
  * @mentions become targets; the text itself is never scanned for commands.
  */
 export function Composer() {
-  const { id, state, limits, running, act } = useRoom();
+  const { id, state, limits, running, act, models, standardContextBudget } = useRoom();
   const [text, setText] = useState("");
-  const [mode, setMode] = useState<Mode>(state.meeting.defaultMode);
+  // Blind first: first answers stay independent. The pick stays after sending, and the selector always shows it.
+  const [mode, setMode] = useState<Mode>("blind");
   const [mentions, setMentions] = useState<string[]>([]);
   const [mentionMode, setMentionMode] = useState<"blind" | "in_turn">("blind");
   const [query, setQuery] = useState<string | null>(null);
@@ -41,11 +43,11 @@ export function Composer() {
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // A room-rule change moves the default, unless the chair picked something else already.
-  const defaultMode = state.meeting.defaultMode;
-  useEffect(() => setMode((m) => (m === "none" ? m : defaultMode)), [defaultMode]);
-
   const seats = state.seats.filter((s) => !s.removedAt);
+  // ADR 0015: nudge the chair toward a summary before seats lose older turns.
+  const contextFull =
+    standardContextBudget !== null &&
+    seats.some((s) => seatContext(s, state, models, standardContextBudget).tone !== "ok");
   const active = seats.filter((s) => !s.muted);
   const chosen = mentions
     .map((sid) => seats.find((s) => s.id === sid))
@@ -87,7 +89,7 @@ export function Composer() {
     const before = text.slice(0, caret).replace(/(^|\s)@[^\s@]*$/, "$1");
     setText(before + text.slice(caret));
     setMentions((m) => [...m, seat.id]);
-    if (mode === "none") setMode(defaultMode);
+    if (mode === "none") setMode("blind");
     setQuery(null);
     requestAnimationFrame(() => el?.focus());
   }
@@ -99,7 +101,7 @@ export function Composer() {
       ? { text, mode: "none" as const, targets: "everyone" as const }
       : chosen.length
         ? { text, mode: mentionMode, targets: chosen.map((s) => s.id) }
-        : { text, mode: mode === "none" ? defaultMode : mode, targets: "everyone" as const };
+        : { text, mode: mode === "none" ? "blind" : mode, targets: "everyone" as const };
     const ok = await act(() => api.send(id, action));
     setSending(false);
     if (ok) {
@@ -346,9 +348,12 @@ export function Composer() {
             </Button>
           </div>
         </div>
-        <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground">
-          Seats speak only when you give them the floor.
-        </p>
+        {contextFull && (
+          <p className="mt-1.5 text-center text-[0.6875rem] text-warn">
+            A seat's context is nearly full: have a seat write minutes and post them, or copy them
+            into the brief.
+          </p>
+        )}
       </div>
     </div>
   );

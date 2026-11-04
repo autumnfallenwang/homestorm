@@ -90,3 +90,5 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0011](docs/adr/0011-one-admin-login.md) | One admin login with Better Auth, created at first-run setup |
 | [0012](docs/adr/0012-long-meetings-answer-length-effort.md) | Long meetings trimmed per seat; Concise / Detailed; per-seat thinking effort |
 | [0013](docs/adr/0013-intro-and-floor-note-templates.md) | Intro and floor-note templates fixed in code |
+| [0014](docs/adr/0014-tools-through-mcpgw.md) | Tools (web search first) come from mcpgw, the tool gateway; homestorm runs the tool loop. Not built yet |
+| [0015](docs/adr/0015-meeting-brief-and-full-context-policy.md) | A meeting brief every seat always sees; when a view is full, keep the start, the latest posted wrap-up and the newest turns |

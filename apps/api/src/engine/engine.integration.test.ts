@@ -324,6 +324,7 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
   it("gives thinking room on top of the answer cap, within the model's limit", async () => {
     const w = await world();
     await store.updateSeat(w.claude.id, { reasoningEffort: "high" });
+    await store.updateSeat(w.ds.id, { answerLength: "detailed" });
     w.llm.models = w.llm.models.map((m) =>
       m.id === "gpt-6-luna" ? { ...m, maxTokens: 4_096 } : m,
     );
@@ -335,9 +336,69 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     });
     await w.engine.waitIdle(w.meeting.id);
     // Concise: 2,048 for the answer, plus 8,192 thinking room at low effort or 32,768 at high.
-    expect(w.llm.callsFor("deepseek-v4-pro")[0]?.maxTokens).toBe(10_240);
+    // DeepSeek has its own Detailed: 8,192 for the answer, plus 8,192 at low effort.
+    expect(w.llm.callsFor("deepseek-v4-pro")[0]?.maxTokens).toBe(16_384);
     expect(w.llm.callsFor("claude-opus-5-5")[0]?.maxTokens).toBe(34_816);
     expect(w.llm.callsFor("gpt-6-luna")[0]?.maxTokens).toBe(4_096);
+  });
+
+  it("trims each seat to its own context budget, and saves each view's size", async () => {
+    const w = await world();
+    await store.updateSeat(w.claude.id, { contextBudget: "small" });
+    // Each answer is about 13k tokens by the budget estimate, so three rounds pass Small (32k) but not Standard.
+    const long = { chunks: ["x".repeat(40_000)] };
+    w.llm.on("claude-opus-5-5", long);
+    w.llm.on("gpt-6-luna", long);
+    for (const text of ["Q1", "Q2", "Q3"]) {
+      await w.engine.send(w.meeting.id, {
+        text,
+        mode: "blind",
+        targets: [w.claude.id, w.gpt.id],
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+    }
+    const third = (await seatMessages(w.meeting.id)).slice(-2);
+    const claude = third.find((m) => m.seatId === w.claude.id)!;
+    const gpt = third.find((m) => m.seatId === w.gpt.id)!;
+    expect(claude.trimmedCount).toBeGreaterThan(0);
+    expect(claude.viewTokens).toBeLessThanOrEqual(32_000);
+    expect(gpt.trimmedCount).toBe(0);
+    expect(gpt.viewTokens).toBeGreaterThan(32_000);
+  });
+
+  it("gives each turn the brief from before it started, so Retry rebuilds the same view", async () => {
+    const w = await world();
+    w.llm.on("claude-opus-5-5", { chunks: [] }, { chunks: ["Answer."] });
+    expect(await w.engine.setBrief(w.meeting.id, "Facts v1")).not.toBeNull();
+    expect(await w.engine.setBrief(w.meeting.id, "  Facts v1 ")).toBeNull();
+    await w.engine.send(w.meeting.id, {
+      text: "Q",
+      mode: "blind",
+      targets: [w.claude.id],
+      replyTo: null,
+    });
+    await w.engine.waitIdle(w.meeting.id);
+    const failed = (await seatMessages(w.meeting.id))[0]!;
+    expect(failed.status).toBe("error");
+
+    await w.engine.setBrief(w.meeting.id, "Facts v2");
+    await w.engine.retry(w.meeting.id, failed.id);
+    await w.engine.waitIdle(w.meeting.id);
+    const retried = w.llm.callsFor("claude-opus-5-5")[1]!;
+    expect(retried.messages[0]?.content).toContain("Facts v1");
+    expect(retried.messages[0]?.content).not.toContain("Facts v2");
+
+    await w.engine.send(w.meeting.id, {
+      text: "Q2",
+      mode: "blind",
+      targets: [w.gpt.id],
+      replyTo: null,
+    });
+    await w.engine.waitIdle(w.meeting.id);
+    const later = w.llm.callsFor("gpt-6-luna")[0]!;
+    expect(later.messages[0]?.content).toContain("Facts v2");
+    expect(userText(later)).toContain("The Chair updated the meeting brief.");
   });
 
   it("reply-to quotes the target in the floor note and refuses the author replying to itself", async () => {

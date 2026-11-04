@@ -4,8 +4,57 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-04
+
+- **Meeting brief and a new full-context policy** ([ADR 0015](adr/0015-meeting-brief-and-full-context-policy.md)).
+  - **The brief:** standing context the chair writes (optional in New meeting, editable from a card pinned at the
+    top). Every seat gets it in its intro after the title, and it's never trimmed. It follows the meeting clock
+    (`author_kind = 'brief'`, one message per version, migration `0004_brief_author_kind`), so a blind round shares
+    one version and Retry repeats it. A change after the discussion started leaves "(The Chair updated the meeting
+    brief…)" in later views; the transcript shows "You updated the meeting brief · show this version"; the export
+    puts the current brief at the top. Capped at 12,000 characters.
+  - **Over budget:** the intro (with the brief), the first question, the latest posted wrap-up and the newest turns
+    stay; turns before the wrap-up go first ("…the summary below covers them"), then the oldest after it.
+  - **The chair's summaries:** "Copy into the brief" on a posted wrap-up opens the brief editor with it appended.
+    The context bar turns amber at 80% and says "Trimming older turns" once a turn was trimmed; the message box then
+    suggests minutes.
+  - **Context % on the seat card:** "Context ≈6.4k of 120k · 5%", with the share of the model's window in a tooltip.
+    It's our own estimate: llmgw 0.5.0 returns `usage` for non-streamed calls only (checked again today), and
+    homestorm streams.
+  - **Checked:** view, engine (Retry keeps the old brief), route, export and web tests (114 in all). In the browser
+    on localhost, a throwaway meeting with a DeepSeek Flash seat answered "Pixel" from the brief, then "Nova" after
+    the brief changed, noting the change. Found and fixed there: the export said "set" for every brief version.
+- **Tools planned, through mcpgw** ([ADR 0014](adr/0014-tools-through-mcpgw.md), M9 in [plan.md](plan.md)). Models
+  behind llmgw can't look anything up. Tools will come from a new home-cluster gateway, **mcpgw** (design at
+  `~/agentic/mcpgw/docs/design.md`), and homestorm will run the tool loop: the date in the intro, then chair search,
+  then seat tools. Waits for mcpgw.
+- **Tool loop tried with a fake MCP server** against the real llmgw. Claude Haiku 5.5, GPT-5.6 Luna and DeepSeek
+  Flash each chose to search for a price, wrote their own query and quoted the fake result. None searched for a
+  question they already knew. They trusted the fake source differently (Claude doubted it, GPT didn't), so sources
+  must stay visible. Scripts kept at `~/agentic/mcpgw/dev/tool-loop-demo/`.
+- **GPT plan changed** (details in `private/notes.md`): all seven GPT models are available now. homestorm picked it
+  up from llmgw with no change.
+
 ## 2026-11-03
 
+- **Context budget per seat:** Small (32k), Standard (120k, the default), Large (half the window) or Full (the whole
+  window minus room for the answer), in the Add seat and Edit seat dialogs, each showing its size for that model
+  and the model's window ([ADR 0012](adr/0012-long-meetings-answer-length-effort.md)). The seat card shows "Context
+  ≈6.4k of 120k" with a bar. Large and Full warn that a long meeting re-sends that much every turn. Migration
+  `0003_seat_context_budget` adds `seats.context_budget` and `messages.view_tokens`; the budget math moved to
+  `packages/shared/src/budget.ts` so the web shows the API's numbers. What to do when a meeting outgrows its
+  budget (only trimming today) is still open.
+- **Removed the "New questions go to" room rule.** It only chose where the message box started; the server never
+  read it, and having it next to the message box's own selector confused people. Now the message box starts on
+  Everyone · blind and keeps your pick after sending; the @mention toggle and the Reply to… picker also start on
+  Blind (the picker started on In turn). Migration `0002_drop_default_mode` drops `meetings.default_mode`; nothing
+  else read it. Room rules now holds only answer length and the two fixed rules.
+- **A seat can have its own answer length:** Room rule (the default), Concise, always, or Detailed, always, in the
+  Add seat and Edit seat dialogs. The chair's message still wins for one turn, then the seat's setting, then the room
+  rule ([ADR 0012](adr/0012-long-meetings-answer-length-effort.md)). The intro line and the output cap follow it; the
+  seat card shows "Detailed answers"; setting it adds an event line; the export lists it. Migration
+  `0001_seat_answer_length` adds a nullable `seats.answer_length`. The seat menu's "Edit name and persona" is now
+  "Edit seat…". Covered by unit, view, engine and route tests; checked in the browser on localhost.
 - **Live test on localhost:** a 5-seat meeting run step by step, with the chair deciding each question from the
   answers. The seats were Claude Opus 5.5, GPT-6 Luna, DeepSeek V4 Pro, "The Skeptic" (GPT-6 Luna with a persona)
   and "Scribe" (DeepSeek Flash, muted). The topic: one shared Postgres for the cluster's apps, or one per app.

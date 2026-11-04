@@ -25,7 +25,7 @@ import { SeatAvatar } from "./source";
 export function ReplyDialog({ target, onClose }: { target: Message | null; onClose: () => void }) {
   const { id, state, limits, running, act, seatName } = useRoom();
   const [picked, setPicked] = useState<string[]>([]);
-  const [mode, setMode] = useState<"blind" | "in_turn">("in_turn");
+  const [mode, setMode] = useState<"blind" | "in_turn">("blind");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +33,7 @@ export function ReplyDialog({ target, onClose }: { target: Message | null; onClo
   useEffect(() => {
     setPicked([]);
     setNote("");
-    setMode("in_turn");
+    setMode("blind");
   }, [target]);
 
   const seats = state.seats.filter((s) => !s.removedAt && s.id !== target?.seatId);
@@ -94,10 +94,10 @@ export function ReplyDialog({ target, onClose }: { target: Message | null; onClo
             className="flex gap-4"
           >
             <label className="flex items-center gap-2 text-sm">
-              <RadioGroupItem value="in_turn" /> In turn
+              <RadioGroupItem value="blind" /> Blind
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <RadioGroupItem value="blind" /> Blind
+              <RadioGroupItem value="in_turn" /> In turn
             </label>
           </RadioGroup>
         )}

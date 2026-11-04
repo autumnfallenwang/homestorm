@@ -9,14 +9,18 @@
 
 import { randomUUID } from "node:crypto";
 import {
+  briefAt,
   canTakeFloor,
+  contextBudgetTokens,
   type Meeting,
   type MeetingEvent,
   type MeetingState,
   type Message,
+  maxOutputTokens,
   type Round,
   type Seat,
   type SendAction,
+  seatAnswerLength,
   stripSpeakerTag,
   type WrapKind,
 } from "@homestorm/shared";
@@ -25,7 +29,7 @@ import { type LlmClient, toLlmError } from "../services/llmgw.js";
 import type { MessagePatch, Store } from "../services/store.js";
 import type { EventHub } from "./hub.js";
 import type { Floor, ReplyTarget } from "./prompts.js";
-import { displayTokens, maxOutputTokens, viewBudget } from "./tokens.js";
+import { displayTokens } from "./tokens.js";
 import { buildView } from "./view.js";
 
 /** A refused action, mapped onto an HTTP status by the routes. */
@@ -95,6 +99,11 @@ export class Engine {
   }
 
   /** The meeting as saved, with the live text of answers still streaming (the stream's `snapshot`). */
+  /** The Standard context budget (`VIEW_TOKEN_BUDGET`), for showing the presets' sizes. */
+  get standardContextBudget(): number {
+    return this.budget;
+  }
+
   async snapshot(meetingId: string): Promise<MeetingState | null> {
     const state = await this.store.getState(meetingId);
     if (!state) return null;
@@ -142,7 +151,11 @@ export class Engine {
     let replyTo: Message | null = null;
     if (action.replyTo) {
       replyTo = await this.store.getMessage(meetingId, action.replyTo);
-      if (replyTo?.status !== "done" || replyTo.authorKind === "event") {
+      if (
+        replyTo?.status !== "done" ||
+        replyTo.authorKind === "event" ||
+        replyTo.authorKind === "brief"
+      ) {
         throw new EngineError(400, "That message can't be replied to.");
       }
       if (replyTo.authorKind === "seat" && targets.some((s) => s.id === replyTo?.seatId)) {
@@ -302,6 +315,36 @@ export class Engine {
       status: "skipped",
       finishedAt: msg.finishedAt ? undefined : new Date(),
     });
+  }
+
+  /**
+   * Set, change or clear the meeting brief (ADR 0015). Each change is a new version on the meeting clock, so a turn
+   * gets the version from before it started. No change, no new version.
+   */
+  async setBrief(meetingId: string, content: string): Promise<Message | null> {
+    await this.requireMeeting(meetingId);
+    const text = content.trim();
+    const state = await this.store.getState(meetingId);
+    const current = state ? briefAt(state.messages, state.meeting.clock) : "";
+    if (text === current) return null;
+    const visibleSeq = await this.store.bumpClock(meetingId);
+    const now = new Date();
+    const message = await this.store.insertMessage({
+      meetingId,
+      authorKind: "brief",
+      content: text,
+      status: "done",
+      visibleSeq,
+      startedAt: now,
+      finishedAt: now,
+    });
+    this.emit(meetingId, { type: "message", message });
+    await this.emitMeeting(meetingId);
+    log.info(
+      { event: "brief.set", meeting_id: meetingId, chars: text.length, visible_seq: visibleSeq },
+      text ? "meeting brief saved" : "meeting brief cleared",
+    );
+    return message;
   }
 
   /** A transcript line for the chair, e.g. "You muted Claude Sonnet 5.5 for rounds". Seats never see these. */
@@ -549,7 +592,7 @@ export class Engine {
     const models = await this.llm.listModels().catch(() => []);
     const info = models.find((m) => m.id === seat.model);
     const outputCap = maxOutputTokens(
-      state.meeting.answerLength,
+      seatAnswerLength(seat, state.meeting),
       seat.reasoningEffort,
       info?.maxTokens ?? null,
     );
@@ -560,7 +603,12 @@ export class Engine {
       seat,
       cutoffSeq,
       floor,
-      budget: viewBudget(info?.contextWindow ?? null, outputCap, this.budget),
+      budget: contextBudgetTokens(
+        seat.contextBudget ?? "standard",
+        info?.contextWindow ?? null,
+        outputCap,
+        this.budget,
+      ),
     });
 
     const requestId = `homestorm-${randomUUID()}`;
@@ -574,6 +622,7 @@ export class Engine {
       finishedAt: null,
       requestId,
       trimmedCount: view.trimmedCount,
+      viewTokens: view.estimatedTokens,
       model: seat.model,
       ownedBy: seat.ownedBy,
       reasoningEffort: seat.reasoningEffort,
