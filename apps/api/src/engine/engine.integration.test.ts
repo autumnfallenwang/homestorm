@@ -292,11 +292,15 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     expect(retryCall?.model).toBe("gpt-6-luna");
   });
 
-  it("a seat out of allowance can't take the floor, and llmgw isn't called", async () => {
+  it("calls a seat llmgw says is exhausted, and shows the provider's refusal if it comes", async () => {
     const w = await world();
     w.llm.limitsByModel.set("deepseek-v4-pro", {
       status: "exhausted",
       available: { kind: "balance", amount: 0, currency: "USD" },
+    });
+    w.llm.on("deepseek-v4-pro", {
+      chunks: [],
+      error: new LlmError("out_of_allowance", "Insufficient balance", 429),
     });
     await w.engine.send(w.meeting.id, {
       text: "Q",
@@ -308,7 +312,7 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     const ds = (await seatMessages(w.meeting.id)).find((m) => m.seatId === w.ds.id);
     expect(ds?.status).toBe("error");
     expect(ds?.error?.code).toBe("out_of_allowance");
-    expect(w.llm.callsFor("deepseek-v4-pro")).toHaveLength(0);
+    expect(w.llm.callsFor("deepseek-v4-pro")).toHaveLength(1);
   });
 
   it("an empty answer is a visible problem, not a blank message", async () => {

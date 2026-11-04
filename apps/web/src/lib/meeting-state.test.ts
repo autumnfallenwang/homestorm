@@ -209,6 +209,13 @@ describe("format", () => {
     expect(
       seatStatus(seat, state([]), { status: "exhausted", available: { kind: "unknown" } }),
     ).toBe("Out of allowance");
+    // llmgw's "exhausted" with some left (Claude at 90%): a warning, and the seat can still be asked.
+    expect(
+      seatStatus(seat, state([]), {
+        status: "exhausted",
+        available: { kind: "percent", percentLeft: 10, resetsAt: null, binding: "weekly" },
+      }),
+    ).toBe("Allowance low");
     expect(seatStatus({ ...seat, muted: true }, state([msg({ status: "done" })]), null)).toBe(
       "Muted",
     );

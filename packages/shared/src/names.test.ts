@@ -47,12 +47,12 @@ describe("ordinal", () => {
 });
 
 describe("canTakeFloor", () => {
-  it("blocks exhausted and unavailable seats only", () => {
+  it("blocks only models that aren't on the plan, not an exhausted allowance", () => {
     expect(canTakeFloor(null)).toBe(true);
     expect(canTakeFloor({ status: "ok", available: { kind: "unknown" } })).toBe(true);
     expect(canTakeFloor({ status: "warning", available: { kind: "unknown" } })).toBe(true);
     expect(canTakeFloor({ status: "unknown", available: { kind: "unknown" } })).toBe(true);
-    expect(canTakeFloor({ status: "exhausted", available: { kind: "unknown" } })).toBe(false);
+    expect(canTakeFloor({ status: "exhausted", available: { kind: "unknown" } })).toBe(true);
     expect(
       canTakeFloor({ status: "unavailable", available: { kind: "unavailable", reason: "x" } }),
     ).toBe(false);

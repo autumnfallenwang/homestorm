@@ -698,20 +698,18 @@ export class Engine {
       owned_by: seat.ownedBy,
     };
 
-    // A seat that's out of allowance, or whose model isn't on the plan, can't take the floor (ADR 0002).
+    // A model that isn't on the plan can't take the floor (ADR 0002). An exhausted allowance isn't refused here: the
+    // provider decides, and a real rejection comes back as a 429 shown as "Out of allowance".
     const limits = await this.llm.limits(seat.model);
     if (!canTakeFloor(limits)) {
-      const out = limits?.status === "exhausted";
       const reason = limits?.available.kind === "unavailable" ? limits.available.reason : undefined;
       await this.patch(msg, {
         status: "error",
         cutoffSeq,
         finishedAt: new Date(),
         error: {
-          code: out ? "out_of_allowance" : "unavailable",
-          message: out
-            ? "Out of allowance until it resets."
-            : (reason ?? "This model isn't available on the current plan."),
+          code: "unavailable",
+          message: reason ?? "This model isn't available on the current plan.",
         },
       });
       log.warn(

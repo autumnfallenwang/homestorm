@@ -6,6 +6,12 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-04
 
+- **An exhausted allowance no longer blocks a seat** ([ADR 0002](adr/0002-llm-access-through-llmgw.md), the user's
+  call). Claude seats were refused because llmgw said `exhausted` with 10% of the week left: it reads Anthropic's
+  near-limit severity as exhausted, while Claude still answered. Now only a model that isn't on the plan is refused;
+  the card says "Allowance low" or "Out of allowance" in amber or red; a real provider refusal (a 429 about quota,
+  balance or a usage limit) shows on the message as "Out of allowance". Checked: a Claude Haiku seat at 9% left
+  answered, with its real 483-token prompt count.
 - **llmgw 0.6.0 picked up** (it fixed what homestorm had reported).
   - **Image support:** the image hint reads `/v1/models` `input` instead of homestorm's own list.
   - **Real token counts:** streamed answers now carry usage, so messages save real counts. The context meter shows

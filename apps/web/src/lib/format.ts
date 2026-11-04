@@ -25,7 +25,7 @@ export function allowanceLine(limits: Limits | null | undefined, now = new Date(
       return {
         text,
         percent: left,
-        tone: limits.status === "exhausted" ? "bad" : left < 20 ? "warn" : "ok",
+        tone: left === 0 ? "bad" : left < 20 || limits.status === "exhausted" ? "warn" : "ok",
       };
     }
     case "balance":
@@ -72,6 +72,7 @@ export type SeatStatus =
   | "Muted"
   | "Rate limited"
   | "Out of allowance"
+  | "Allowance low"
   | "Unavailable";
 
 /** A seat's state, always as words (ADR 0007). */
@@ -83,7 +84,12 @@ export function seatStatus(
   const own = state.messages.filter((m) => m.seatId === seat.id);
   if (own.some((m) => m.status === "streaming")) return "Answering";
   if (own.some((m) => m.status === "queued")) return "Next";
-  if (limits?.status === "exhausted") return "Out of allowance";
+  // Shown, not enforced: the provider decides (canTakeFloor). llmgw may say "exhausted" with some left.
+  if (limits?.status === "exhausted") {
+    const a = limits.available;
+    const left = a.kind === "percent" ? a.percentLeft : a.kind === "balance" ? a.amount : 0;
+    return left > 0 ? "Allowance low" : "Out of allowance";
+  }
   if (limits?.status === "unavailable") return "Unavailable";
   const last = own.at(-1);
   if (last?.status === "error" && last.error?.code === "rate_limited") return "Rate limited";

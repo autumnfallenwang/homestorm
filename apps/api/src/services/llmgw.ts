@@ -265,6 +265,14 @@ export function toLlmError(err: unknown, signal?: AbortSignal): LlmError | Error
       err.error && typeof err.error === "object" && "message" in err.error
         ? String((err.error as { message: unknown }).message)
         : err.message;
+    // Out of allowance: DeepSeek's empty balance, a subscription's used-up window. Told apart from a short rate
+    // limit so the problem says what it is.
+    if (
+      code === "insufficient_quota" ||
+      (err.status === 429 && /usage limit|quota|insufficient balance|out of credits/i.test(message))
+    ) {
+      return new LlmError("out_of_allowance", message, err.status);
+    }
     if (err.status === 429 || code === "rate_limit_exceeded" || type === "rate_limit_exceeded") {
       return new LlmError("rate_limited", message, err.status);
     }

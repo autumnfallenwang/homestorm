@@ -189,7 +189,8 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
 5. **Seat menu (⋯).** Ask now, Mute in rounds, Edit name and persona, Move up / down in seat order, and Remove from
    meeting (in red).
 6. **Seat states.** Always labeled in words, not only by color: Answering, Next, Idle, Muted, Rate limited,
-   Out of allowance. Rate limited and out-of-allowance seats can't take the floor until reset; the card shows when.
+   Allowance low, Out of allowance. They inform, they don't block: the provider decides, and a refusal shows on the
+   message (changed 2026-11-04). Only a model that isn't on the plan can't take the floor.
 7. **Wrap up dialog.** Pick who writes it, then Minutes (the question, each seat's position, where they agreed and
    disagreed) / Decision and reasons / Open questions, then Write minutes. The wrap-up is held back for the chair
    to read ("not posted"), with **Post to the meeting** under it; "Post it right away" in the dialog skips that

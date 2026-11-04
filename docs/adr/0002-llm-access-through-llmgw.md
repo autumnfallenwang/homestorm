@@ -23,8 +23,12 @@ The chair needs to trust that each reply came from the model shown: no silent su
   back to another model. homestorm never retries on a *different* model either; retry always uses the same one.
 - **Each saved message records** the model ID, `owned_by`, token usage, `cost_usd` and llmgw's `req_id`. Any message
   can then be traced in Loki with `{namespace="llmgw"} | json | req_id="<id>"`.
-- **Seat cards** show allowance from `/v1/limits?model=`. A seat whose status is `unavailable` or `exhausted` can't take
-  the floor.
+- **Seat cards** show allowance from `/v1/limits?model=`. A seat whose status is `unavailable` (not on the plan) can't
+  take the floor.
+- **An `exhausted` allowance is shown, not enforced** (changed 2026-11-04, the user's call). llmgw reported Claude
+  `exhausted` at 90% of its week while Claude still answered, because it reads Anthropic's near-limit severity as
+  exhausted. Now the card says "Allowance low" (some left) or "Out of allowance" (none), the seat can still be
+  asked, and a real refusal comes back as a 429 shown as "Out of allowance" on the message.
 
 ## Alternatives considered
 

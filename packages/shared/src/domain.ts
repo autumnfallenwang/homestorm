@@ -381,7 +381,11 @@ export interface Limits {
   available: Allowance;
 }
 
-/** A seat can take the floor unless llmgw says its allowance is gone or the model is unavailable. */
+/**
+ * Whether homestorm lets a seat take the floor. Only a model that isn't on the plan is refused before the call: it
+ * always fails. An "exhausted" allowance is shown but not enforced (2026-11-04): llmgw can say "exhausted" while the
+ * provider still answers (Claude at 90% of its week), and a real rejection comes back as a visible problem anyway.
+ */
 export function canTakeFloor(limits: Limits | null | undefined): boolean {
-  return !limits || (limits.status !== "exhausted" && limits.status !== "unavailable");
+  return !limits || limits.status !== "unavailable";
 }

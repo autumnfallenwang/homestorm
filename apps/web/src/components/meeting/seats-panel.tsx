@@ -71,6 +71,7 @@ const STATUS_TONE: Record<string, string> = {
   Muted: "text-muted-foreground",
   "Rate limited": "text-warn",
   "Out of allowance": "text-destructive",
+  "Allowance low": "text-warn",
   Unavailable: "text-destructive",
 };
 
