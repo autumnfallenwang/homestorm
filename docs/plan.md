@@ -3,7 +3,7 @@
 What the first workable version of homestorm includes, the milestones to get there, and the decisions still open.
 Progress against this plan is logged in [progress.md](progress.md).
 
-**Updated:** 2026-11-02
+**Updated:** 2026-11-05
 
 ---
 
@@ -137,24 +137,23 @@ v1 is done. Next candidates are in "Out (later)" above.
 
 ## Future work
 
-### M9: Tools through mcpgw (waits for mcpgw) ⏸
+### M9: Tools through mcpgw ✅
 
 Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw**, the home cluster's tool gateway
-(design: `~/agentic/mcpgw/docs/design.md`); homestorm runs the tool loop. A fake-MCP-server test against the real
-llmgw already showed all three families choosing to search, writing their own queries, and answering from the
-result (`~/agentic/mcpgw/dev/tool-loop-demo/`).
+(`~/agentic/mcpgw`, http://mcpgw.arch.internal); homestorm runs the tool loop.
 
-- [ ] **Prerequisite:** mcpgw built and deployed (`web_search` via SearXNG, `web_fetch`), at `mcpgw.arch.internal`
-- [ ] **The date in the intro:** "Today is …; your training data may be older." No mcpgw needed, so it can go first
-- [ ] **Chair search:** a "Search the web" action in the message box; homestorm calls mcpgw's `web_search` and posts
-  the results as one "Sources" message every seat sees
-- [ ] **Seat tools:**
-  - a seat setting "Can search the web";
-  - the tool loop in the engine, with a per-turn call limit;
-  - "Searched: … · Read: …" under the answer, and the sources in the record;
-  - a "must search" option (`tool_choice: required`)
-- [ ] **Check first:** streaming `tool_calls` through llmgw (the demo used non-streaming calls)
-- [ ] **Tests:** a fake MCP server next to `FakeLlm`, seeded from the demo
+- [x] **Prerequisite:** mcpgw built and deployed
+- [x] **The date in the intro:** "Today is …; your training data may be older."
+- [x] **Chair search:** a "Search the web" action in the message box; the results are posted as one message every seat
+  sees
+- [x] **Seat tools:**
+  - a seat setting: off, "Can search and read pages", or "Must search before answering";
+  - the tool loop in the engine, with a limit of 4 calls per turn;
+  - "Searched: … · Read: …" under the answer, and the sources in the record and the export;
+  - the URL rule: only links from the Chair or a search; images in answers never load
+- [x] **Checked first:** streaming `tool_calls` through llmgw, on all three families with thinking on
+- [x] **Tests:** `FakeTools` next to `FakeLlm`, a fake MCP server over HTTP for the client, and a real meeting in a real
+  browser
 
 ### Attachments ([ADR 0016](adr/0016-attachments-images-and-text-files.md))
 

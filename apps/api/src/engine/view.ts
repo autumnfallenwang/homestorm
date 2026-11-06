@@ -22,6 +22,7 @@ import {
   type Message,
   type Seat,
   seatAnswerLength,
+  toolSummary,
   type WrapKind,
 } from "@homestorm/shared";
 import {
@@ -76,6 +77,10 @@ export interface ViewInput {
   budget: number;
   /** Attachments by message id, chair messages and brief versions (ADR 0016). */
   attachments?: Map<string, ViewAttachment[]>;
+  /** Today, as YYYY-MM-DD. Defaults to the current date, in UTC. */
+  today?: string;
+  /** This seat is being offered web tools this turn (ADR 0014). */
+  webTools?: boolean;
 }
 
 export interface View {
@@ -174,6 +179,8 @@ export function buildView(input: ViewInput): View {
   const briefText = [briefAt(messages, input.cutoffSeq), briefFiles].filter(Boolean).join("\n\n");
 
   const intro = renderIntro({
+    today: input.today ?? new Date().toISOString().slice(0, 10),
+    webTools: input.webTools ?? false,
     meetingTitle: input.meeting.title,
     self: { displayName: seat.displayName, model: seat.model, persona: seat.persona },
     roster,
@@ -218,7 +225,9 @@ export function buildView(input: ViewInput): View {
     const text = m.content.trim() ? m.content : ATTACHMENTS_ONLY;
     const imageLabel = images.length ? imagesNote(images.map((i) => i.name)) : undefined;
     const withFiles = files ? `${text}\n\n${files}` : text;
-    const content = m.stoppedEarly ? `${withFiles}\n\n${CUT_OFF_NOTE}` : withFiles;
+    const sources = m.authorKind === "seat" ? toolSummary(m.toolCalls) : null;
+    const withSources = sources ? `${withFiles}\n\n(${sources})` : withFiles;
+    const content = m.stoppedEarly ? `${withSources}\n\n${CUT_OFF_NOTE}` : withSources;
     const isSummary = m.authorKind === "seat" && !!m.wrapKind;
     if (m.authorKind === "seat" && m.seatId === seat.id) {
       items.push({ role: "assistant", content, images, imageLabel, isChair: false, isSummary });
@@ -235,6 +244,7 @@ export function buildView(input: ViewInput): View {
   }
 
   function speakerTag(m: Message): string {
+    if (m.authorKind === "sources") return "[Web search results the Chair posted]";
     let tag = authorOf(m);
     const target = m.replyToId ? byId.get(m.replyToId) : undefined;
     if (target) {

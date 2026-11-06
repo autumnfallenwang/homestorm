@@ -12,6 +12,7 @@ import {
   seatNameClashMessage,
   sourceFamily,
   uniqueSeatName,
+  type WebAccess,
 } from "@homestorm/shared";
 import { Loader2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -42,6 +43,7 @@ import { AnswerLengthSelect } from "./answer-length-select";
 import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
+import { WebAccessSelect } from "./web-access-select";
 
 const SOURCE_ORDER: Source[] = ["anthropic", "openai-codex", "deepseek"];
 const SOURCE_TITLE: Record<Source, string> = {
@@ -63,6 +65,7 @@ export function AddSeatDialog() {
   const [effort, setEffort] = useState<ReasoningEffort>("low");
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
+  const [web, setWeb] = useState<WebAccess>("off");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -95,6 +98,7 @@ export function AddSeatDialog() {
     setEffort("low");
     setLength(null);
     setBudget(null);
+    setWeb("off");
     setQuery("");
   }
 
@@ -109,6 +113,7 @@ export function AddSeatDialog() {
         reasoningEffort: effort,
         answerLength: length,
         contextBudget: budget,
+        webAccess: web,
       }),
     );
     setBusy(false);
@@ -291,6 +296,7 @@ export function AddSeatDialog() {
               )}
               standard={data?.standardContextBudget ?? null}
             />
+            {data?.webTools && <WebAccessSelect value={web} onChange={setWeb} />}
           </div>
         )}
 

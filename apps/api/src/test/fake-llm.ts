@@ -2,7 +2,13 @@
 // so tests can check exactly what each seat was shown.
 
 import type { Limits, ModelInfo, Source } from "@homestorm/shared";
-import { type ChatTurn, type LlmClient, LlmError, type StreamEvent } from "../services/llmgw.js";
+import {
+  type ChatTurn,
+  type LlmClient,
+  LlmError,
+  type StreamEvent,
+  type ToolCall,
+} from "../services/llmgw.js";
 
 export interface Script {
   chunks: string[];
@@ -15,6 +21,8 @@ export interface Script {
   /** Throw this after the chunks. */
   error?: LlmError;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  /** After the chunks, ask for these tools to be run. */
+  toolCalls?: ToolCall[];
 }
 
 const DEFAULT_MODELS: ModelInfo[] = [
@@ -58,7 +66,8 @@ export class FakeLlm implements LlmClient {
   }
 
   async *stream(turn: ChatTurn): AsyncGenerator<StreamEvent> {
-    this.calls.push(turn);
+    // A copy of the messages: the engine adds to its list after each step.
+    this.calls.push({ ...turn, messages: [...turn.messages] });
     const queue = this.scripts.get(turn.model) ?? [];
     const script = (queue.length > 1 ? queue.shift() : queue[0]) ?? {
       chunks: [`answer from ${turn.model}`],
@@ -72,14 +81,22 @@ export class FakeLlm implements LlmClient {
         await sleep(60_000, turn.signal);
       } catch (err) {
         if (!script.quietAbort) throw err;
-        yield { type: "done", finishReason: null, usage: null, costUsd: null, llmgwReqId: null };
+        yield {
+          type: "done",
+          finishReason: null,
+          toolCalls: [],
+          usage: null,
+          costUsd: null,
+          llmgwReqId: null,
+        };
         return;
       }
     }
     if (script.error) throw script.error;
     yield {
       type: "done",
-      finishReason: "stop",
+      finishReason: script.toolCalls?.length ? "tool_calls" : "stop",
+      toolCalls: script.toolCalls ?? [],
       usage: script.usage ?? null,
       costUsd: null,
       llmgwReqId: null,

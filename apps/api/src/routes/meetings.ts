@@ -9,12 +9,13 @@
 //   PUT    /api/meetings/:id/brief                     set, change or clear the brief { content, keepAttachmentIds?, attachments? }
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
-//   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort? }
-//   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort
+//   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort?, webAccess? }
+//   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort, web access
 //                                                      (a name another seat has, or had, is 409)
 //   POST   /api/meetings/:id/seats/:seatId/move        { direction: up | down }
 //   DELETE /api/meetings/:id/seats/:seatId             remove from the meeting
 //   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo, attachments } (ADR 0006)
+//   POST   /api/meetings/:id/search                    the chair's web search { query }, posted as one message (ADR 0014)
 //   POST   /api/meetings/:id/wrap-up                   { seatId, kind, post }
 //   POST   /api/meetings/:id/stop                      { messageId? }
 //   POST   /api/meetings/:id/messages/:mid/retry|keep|skip|post
@@ -29,6 +30,7 @@ import {
   type MeetingEvent,
   MoveSeatInput,
   prettyModelName,
+  SearchInput,
   SendActionInput,
   SetBriefInput,
   type Source,
@@ -38,6 +40,7 @@ import {
   UpdateMeetingInput,
   UpdateSeatInput,
   uniqueSeatName,
+  type WebAccess,
   WrapUpInput,
 } from "@homestorm/shared";
 import { type Context, Hono } from "hono";
@@ -50,6 +53,7 @@ import { log } from "../lib/logger.js";
 import type { AuthVariables } from "../middleware/auth.js";
 import { exportMarkdown } from "../services/export.js";
 import type { LlmClient } from "../services/llmgw.js";
+import type { ToolClient } from "../services/mcpgw.js";
 import type { Store } from "../services/store.js";
 
 export interface MeetingDeps {
@@ -57,6 +61,8 @@ export interface MeetingDeps {
   store: Store;
   llm: LlmClient;
   hub: EventHub;
+  /** mcpgw, when it's configured (ADR 0014). */
+  tools?: ToolClient | null;
   /** SSE keep-alive interval (ms). */
   heartbeatMs?: number;
 }
@@ -75,6 +81,12 @@ function fail(c: Ctx, err: unknown): Response {
   throw err;
 }
 
+const WEB_ACCESS_EVENT: Record<WebAccess, string> = {
+  off: "turned off web tools for",
+  on: "let web tools be used by",
+  must: "told this seat to search before answering:",
+};
+
 const LENGTH_LABEL: Record<AnswerLength, string> = { concise: "Concise", detailed: "Detailed" };
 const BUDGET_LABEL: Record<ContextBudget, string> = {
   small: "Small",
@@ -90,7 +102,7 @@ const uploadLimit = bodyLimit({
 });
 
 export function meetingRoutes(deps: MeetingDeps) {
-  const { engine, store, llm, hub } = deps;
+  const { engine, store, llm, hub, tools } = deps;
   const app = new Hono<{ Variables: AuthVariables }>();
 
   // ── Models (for the add-seat dialog) ──────────────────────────────────────
@@ -102,7 +114,18 @@ export function meetingRoutes(deps: MeetingDeps) {
         const sample = models.find((m) => m.ownedBy === source && m.available);
         families[source] = sample ? await llm.limits(sample.id) : null;
       }
-      return c.json({ models, families, standardContextBudget: engine.standardContextBudget });
+      const webTools = tools
+        ? await tools.list().then(
+            () => true,
+            () => false,
+          )
+        : false;
+      return c.json({
+        models,
+        families,
+        standardContextBudget: engine.standardContextBudget,
+        webTools,
+      });
     } catch (err) {
       log.warn({ event: "llmgw.models_failed", err }, "could not list models");
       return c.json({ error: "Couldn't reach llmgw to list models." }, 502);
@@ -289,6 +312,7 @@ export function meetingRoutes(deps: MeetingDeps) {
       reasoningEffort: input.reasoningEffort ?? "low",
       answerLength: input.answerLength ?? null,
       contextBudget: input.contextBudget ?? null,
+      ...(input.webAccess ? { webAccess: input.webAccess } : {}),
     });
     engine.emit(id, { type: "seat", seat });
     await engine.addEvent(id, `You added ${seat.displayName}`);
@@ -334,6 +358,9 @@ export function meetingRoutes(deps: MeetingDeps) {
         id,
         `You set ${seat.displayName}'s context budget to ${BUDGET_LABEL[seat.contextBudget ?? "standard"]}`,
       );
+    }
+    if (input.webAccess !== undefined && input.webAccess !== before.webAccess) {
+      await engine.addEvent(id, `You ${WEB_ACCESS_EVENT[seat.webAccess]} ${seat.displayName}`);
     }
     return c.json(seat);
   });
@@ -383,6 +410,16 @@ export function meetingRoutes(deps: MeetingDeps) {
     if (input instanceof Response) return input;
     try {
       return c.json(await engine.send(c.req.param("id"), input), 202);
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  app.post("/meetings/:id/search", async (c) => {
+    const input = await parse(c, SearchInput);
+    if (input instanceof Response) return input;
+    try {
+      return c.json(await engine.search(c.req.param("id"), input.query), 201);
     } catch (err) {
       return fail(c, err);
     }

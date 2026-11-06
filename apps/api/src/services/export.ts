@@ -8,6 +8,7 @@ import {
   type Round,
   type Seat,
   sourceLabel,
+  toolSummary,
 } from "@homestorm/shared";
 
 const MODE_LABEL: Record<Round["mode"], string> = {
@@ -59,6 +60,7 @@ export function exportMarkdown(
         s.muted ? "muted" : "",
         s.answerLength ? `answers: ${s.answerLength}` : "",
         s.contextBudget && s.contextBudget !== "standard" ? `context: ${s.contextBudget}` : "",
+        s.webAccess !== "off" ? `web tools: ${s.webAccess}` : "",
         s.persona ? `persona: ${oneLine(s.persona)}` : "",
       ]
         .filter(Boolean)
@@ -113,6 +115,10 @@ export function exportMarkdown(
         );
       continue;
     }
+    if (m.authorKind === "sources") {
+      out.push("**Web search** · posted by the Chair", "", quote(m.content), "");
+      continue;
+    }
     const promptOf = roundByPrompt.get(m.id);
     if (promptOf) heading(promptOf);
     const round = m.roundId ? roundById.get(m.roundId) : undefined;
@@ -149,6 +155,8 @@ export function exportMarkdown(
     if (target) meta.push(`replying to ${name(target)}`);
     out.push(`**${name(m)}** · ${meta.join(" · ")}`, "");
     if (m.content) out.push(m.content, "");
+    const sources = toolSummary(m.toolCalls);
+    if (sources) out.push(`_${sources}_`, "");
     if (m.status === "stopped" || m.stoppedEarly) out.push("_(stopped early)_", "");
     if (m.status === "error") out.push(`_(problem: ${m.error?.message ?? "error"})_`, "");
   }

@@ -45,6 +45,8 @@ api:
     LOG_LEVEL: info
     # Every model call goes through llmgw (ADR 0002), in-cluster: no ingress hop.
     LLMGW_URL: http://llmgw.llmgw.svc.cluster.local
+    # Web search and page reading go through mcpgw (ADR 0014), in-cluster too.
+    MCPGW_URL: http://mcpgw.mcpgw.svc.cluster.local
     # Most tokens one seat's view may use per turn (ADR 0012).
     VIEW_TOKEN_BUDGET: "120000"
   resources:

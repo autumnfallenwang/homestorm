@@ -15,11 +15,44 @@ export type ChatTurnPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
+/** A tool a model may call, in the OpenAI format llmgw takes (ADR 0014). */
+export interface ToolDefinition {
+  type: "function";
+  function: { name: string; description?: string; parameters: Record<string, unknown> };
+}
+
+/** A tool call a model asked for. `arguments` is JSON text, and the model wrote it, so it may not parse. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export type ChatTurnMessage =
+  | { role: "system" | "user"; content: string | ChatTurnPart[] }
+  | {
+      role: "assistant";
+      content: string | ChatTurnPart[] | null;
+      tool_calls?: {
+        id: string;
+        type: "function";
+        function: { name: string; arguments: string };
+      }[];
+    }
+  | { role: "tool"; tool_call_id: string; content: string };
+
 export interface ChatTurn {
   model: string;
-  messages: { role: "system" | "user" | "assistant"; content: string | ChatTurnPart[] }[];
+  messages: ChatTurnMessage[];
   maxTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
+  tools?: ToolDefinition[];
+  /**
+   * `auto`, or one tool by name. Not "required": Anthropic won't force a tool while a model thinks unless it's named,
+   * so llmgw refuses it. And not "none": with thinking on, DeepSeek then writes its raw tool markup into the answer, and
+   * Claude Opus returned no text at all. See the forced final step in engine.ts.
+   */
+  toolChoice?: "auto" | { type: "function"; function: { name: string } };
   /** homestorm's id for this call, sent as X-Request-Id. */
   requestId: string;
   signal?: AbortSignal;
@@ -31,6 +64,8 @@ export type StreamEvent =
   | {
       type: "done";
       finishReason: string | null;
+      /** What the model wants run before it answers. Empty when this is the answer. */
+      toolCalls: ToolCall[];
       usage: {
         promptTokens: number;
         completionTokens: number;
@@ -87,6 +122,8 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
       let usage: Extract<StreamEvent, { type: "done" }>["usage"] = null;
       let costUsd: number | null = null;
       let finishReason: string | null = null;
+      // Tool calls arrive in pieces across chunks, each piece saying which call it belongs to.
+      const calls = new Map<number, ToolCall>();
       try {
         const { data: chunks, response } = await openai.chat.completions
           .create(
@@ -98,6 +135,9 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
               stream_options: { include_usage: true },
               ...(turn.maxTokens ? { max_tokens: turn.maxTokens } : {}),
               ...(turn.reasoningEffort ? { reasoning_effort: turn.reasoningEffort } : {}),
+              ...(turn.tools?.length
+                ? { tools: turn.tools, tool_choice: turn.toolChoice ?? "auto" }
+                : {}),
             },
             { signal: turn.signal, headers: { "X-Request-Id": turn.requestId } },
           )
@@ -115,6 +155,13 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
           if (choice.delta?.refusal) yield { type: "text", text: choice.delta.refusal };
           if (choice.delta?.content) yield { type: "text", text: choice.delta.content };
           else if (choice.delta?.reasoning) yield { type: "thinking" };
+          for (const piece of choice.delta?.tool_calls ?? []) {
+            const call = calls.get(piece.index) ?? { id: "", name: "", arguments: "" };
+            if (piece.id) call.id = piece.id;
+            if (piece.function?.name) call.name += piece.function.name;
+            if (piece.function?.arguments) call.arguments += piece.function.arguments;
+            calls.set(piece.index, call);
+          }
           if (choice.finish_reason) finishReason = choice.finish_reason;
         }
       } catch (err) {
@@ -123,7 +170,14 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
       // ⚠️ The openai SDK ends the stream QUIETLY when the signal aborts: no throw. Without this check a stopped
       // answer looked finished (found in the M6 browser run: Stop all saved a cut-off answer as done).
       if (turn.signal?.aborted) throw new DOMException("The answer was stopped", "AbortError");
-      yield { type: "done", finishReason, usage, costUsd, llmgwReqId };
+      yield {
+        type: "done",
+        finishReason,
+        toolCalls: [...calls.values()],
+        usage,
+        costUsd,
+        llmgwReqId,
+      };
     },
 
     async listModels() {
@@ -170,7 +224,16 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
 
 interface RawChunk {
   choices?: {
-    delta?: { content?: string | null; reasoning?: string | null; refusal?: string | null };
+    delta?: {
+      content?: string | null;
+      reasoning?: string | null;
+      refusal?: string | null;
+      tool_calls?: {
+        index: number;
+        id?: string;
+        function?: { name?: string; arguments?: string };
+      }[];
+    };
     finish_reason?: string | null;
   }[];
   usage?: RawUsage | null;

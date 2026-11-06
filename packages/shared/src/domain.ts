@@ -41,7 +41,8 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 
 /** Who wrote a message. `event` is a transcript line such as "You muted Claude Sonnet 5.5". */
 /** `brief`: a version of the meeting brief (ADR 0015). It enters the record on the clock but isn't a message seats read. */
-export const AUTHOR_KINDS = ["chair", "seat", "event", "brief"] as const;
+/** `sources`: web search results the chair posted (ADR 0014). Every seat reads them. */
+export const AUTHOR_KINDS = ["chair", "seat", "event", "brief", "sources"] as const;
 export type AuthorKind = (typeof AUTHOR_KINDS)[number];
 
 export const ANSWER_LENGTHS = ["concise", "detailed"] as const;
@@ -54,6 +55,13 @@ export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 /** How much of the meeting a seat's view may hold (ADR 0012); see contextBudgetTokens in budget.ts. */
 export const CONTEXT_BUDGETS = ["small", "standard", "large", "full"] as const;
 export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
+
+/**
+ * What a seat may do on the web (ADR 0014). `must` makes it search before answering, for when the chair wants an answer
+ * checked against current sources.
+ */
+export const WEB_ACCESS = ["off", "on", "must"] as const;
+export type WebAccess = (typeof WEB_ACCESS)[number];
 
 export const WRAP_KINDS = ["minutes", "decision", "open_questions"] as const;
 export type WrapKind = (typeof WRAP_KINDS)[number];
@@ -87,6 +95,36 @@ export interface Usage {
   estimated: boolean;
 }
 
+export const TOOL_NAMES = ["web_search", "web_fetch"] as const;
+export type ToolName = (typeof TOOL_NAMES)[number];
+
+/** One tool call a seat made during its turn. It enters the record with the answer, so sources stay visible (ADR 0014). */
+export interface ToolActivity {
+  tool: ToolName;
+  /** The query, or the URL. */
+  input: string;
+  /** `refused`: homestorm's own URL rule stopped it (ADR 0014). `failed`: mcpgw or the site did. */
+  status: "running" | "ok" | "failed" | "refused";
+  /** web_search: the links it returned. These may be fetched later in the meeting. */
+  urls?: string[];
+  /** web_fetch: the page's title. */
+  title?: string;
+  /** Why it failed or was refused. */
+  detail?: string;
+}
+
+/** "Searched: "gold price" · Read: https://…", or null if nothing worked. */
+export function toolSummary(calls: readonly ToolActivity[]): string | null {
+  const worked = calls.filter((c) => c.status === "ok");
+  const searched = worked.filter((c) => c.tool === "web_search").map((c) => `"${c.input}"`);
+  const read = worked.filter((c) => c.tool === "web_fetch").map((c) => c.input);
+  const parts = [
+    searched.length ? `Searched: ${searched.join(", ")}` : "",
+    read.length ? `Read: ${read.join(", ")}` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -113,6 +151,8 @@ export interface Seat {
   answerLength: AnswerLength | null;
   /** How much of the meeting its view may hold; null is Standard (ADR 0012). */
   contextBudget: ContextBudget | null;
+  /** Whether it may use the web (ADR 0014). */
+  webAccess: WebAccess;
   /** Removed seats stay so their old messages keep a name. */
   removedAt: string | null;
   createdAt: string;
@@ -175,6 +215,8 @@ export interface Message {
   attachments: AttachmentMeta[];
   /** A stopped answer whose partial text the chair kept. */
   stoppedEarly: boolean;
+  /** Tool calls during this turn, or the search behind a `sources` message (ADR 0014). */
+  toolCalls: ToolActivity[];
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -246,6 +288,10 @@ export function briefAt(
   return brief;
 }
 
+/** The chair's "Search the web" action (ADR 0014). */
+export const SearchInput = z.object({ query: z.string().trim().min(1).max(400) });
+export type SearchInput = z.infer<typeof SearchInput>;
+
 export const AddSeatInput = z.object({
   model: z.string().trim().min(1).max(200),
   displayName: z.string().trim().min(1).max(60).optional(),
@@ -255,6 +301,8 @@ export const AddSeatInput = z.object({
   answerLength: z.enum(ANSWER_LENGTHS).nullable().optional(),
   /** Omitted or null: Standard. */
   contextBudget: z.enum(CONTEXT_BUDGETS).nullable().optional(),
+  /** Omitted: off. */
+  webAccess: z.enum(WEB_ACCESS).optional(),
 });
 export type AddSeatInput = z.infer<typeof AddSeatInput>;
 
@@ -268,6 +316,7 @@ export const UpdateSeatInput = z
     answerLength: z.enum(ANSWER_LENGTHS).nullable(),
     /** null: back to Standard. */
     contextBudget: z.enum(CONTEXT_BUDGETS).nullable(),
+    webAccess: z.enum(WEB_ACCESS),
   })
   .partial();
 export type UpdateSeatInput = z.infer<typeof UpdateSeatInput>;
@@ -346,6 +395,8 @@ export type MeetingEvent =
   | { type: "round"; round: Round }
   /** A message was created or changed (status, usage, final content). */
   | { type: "message"; message: Message }
+  /** A seat's text so far was only leading up to a tool call, and the answer starts over (ADR 0014). */
+  | { type: "text_reset"; messageId: string }
   /** Text streamed into a message. Apply only when `offset` equals the text you have. */
   | { type: "delta"; messageId: string; offset: number; text: string }
   /** The model is thinking (reasoning deltas are not shown, only that it's happening). */

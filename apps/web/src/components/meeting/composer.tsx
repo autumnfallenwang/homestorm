@@ -1,7 +1,16 @@
 "use client";
 
 import { ATTACHMENT_LIMITS, canTakeFloor, readsImages, type Seat } from "@homestorm/shared";
-import { AtSign, Check, ChevronDown, Loader2, SendHorizontal, Square, X } from "lucide-react";
+import {
+  AtSign,
+  Check,
+  ChevronDown,
+  Globe,
+  Loader2,
+  SendHorizontal,
+  Square,
+  X,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +43,7 @@ const MODE_LABEL: Record<Mode, string> = {
  * @mentions become targets; the text itself is never scanned for commands.
  */
 export function Composer() {
-  const { id, state, limits, running, act, models, standardContextBudget } = useRoom();
+  const { id, state, limits, running, act, models, standardContextBudget, webTools } = useRoom();
   const [text, setText] = useState("");
   // Blind first: first answers stay independent. The pick stays after sending, and the selector always shows it.
   const [mode, setMode] = useState<Mode>("blind");
@@ -46,6 +55,8 @@ export function Composer() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  // "Search the web" (ADR 0014): the text is a query, and the results go to every seat with no model involved.
+  const [searching, setSearching] = useState(false);
 
   async function addFiles(list: File[]) {
     if (!list.length) return;
@@ -85,9 +96,10 @@ export function Composer() {
 
   const comment = mode === "none" && chosen.length === 0;
   const hasContent = !!text.trim() || files.length > 0;
-  const canSend =
-    !sending &&
-    (comment ? hasContent : !running && (chosen.length > 0 || (hasContent && active.length > 0)));
+  const canSend = searching
+    ? !sending && !!text.trim()
+    : !sending &&
+      (comment ? hasContent : !running && (chosen.length > 0 || (hasContent && active.length > 0)));
   // ADR 0016: a seat that can't read images gets llmgw's text description of them instead.
   const receivers = chosen.length ? chosen : active;
   const blindToImages =
@@ -99,6 +111,7 @@ export function Composer() {
 
   function onChange(value: string, caret: number) {
     setText(value);
+    if (searching) return;
     const before = value.slice(0, caret);
     const match = /(^|\s)@([^\s@]*)$/.exec(before);
     setQuery(match ? (match[2] ?? "") : null);
@@ -119,6 +132,15 @@ export function Composer() {
   async function send() {
     if (!canSend) return;
     setSending(true);
+    if (searching) {
+      const ok = await act(() => api.search(id, text.trim()));
+      setSending(false);
+      if (ok) {
+        setText("");
+        setSearching(false);
+      }
+      return;
+    }
     const attachments = toAttachmentInputs(files);
     const action = comment
       ? { text, mode: "none" as const, targets: "everyone" as const, attachments }
@@ -172,7 +194,9 @@ export function Composer() {
   }
 
   let hint: React.ReactNode;
-  if (chosen.length) {
+  if (searching) {
+    hint = "Posts the results for every seat to read. Nobody answers until you ask.";
+  } else if (chosen.length) {
     hint = (
       <span className="flex flex-wrap items-center gap-2">
         Asking {listWords(chosen.map((s) => s.displayName))}
@@ -348,8 +372,13 @@ export function Composer() {
               query !== null && candidates[pick] ? `mention-${candidates[pick]?.id}` : undefined
             }
             placeholder={
-              mode === "none" ? "Write a note for the record…" : "Ask the room… (@ to pick seats)"
+              searching
+                ? "Search the web…"
+                : mode === "none"
+                  ? "Write a note for the record…"
+                  : "Ask the room… (@ to pick seats)"
             }
+            maxLength={searching ? 400 : undefined}
             onChange={(e) => onChange(e.target.value, e.target.selectionStart)}
             onKeyDown={onKeyDown}
             onBlur={() => setTimeout(() => setQuery(null), 150)}
@@ -358,14 +387,32 @@ export function Composer() {
           />
 
           <div className="flex items-center gap-2 px-2 pb-2">
-            <AttachButton onFiles={(f) => void addFiles(f)} disabled={sending} />
+            <AttachButton onFiles={(f) => void addFiles(f)} disabled={sending || searching} />
+            {webTools && (
+              <Button
+                type="button"
+                variant={searching ? "default" : "outline"}
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                aria-pressed={searching}
+                disabled={files.length > 0 || chosen.length > 0}
+                onClick={() => {
+                  setSearching((on) => !on);
+                  setQuery(null);
+                  ref.current?.focus();
+                }}
+              >
+                <Globe className="size-3" />
+                Search the web
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-7 gap-1 text-xs"
-                  disabled={chosen.length > 0}
+                  disabled={chosen.length > 0 || searching}
                 >
                   {chosen.length ? "Chosen seats" : MODE_LABEL[mode]}
                   <ChevronDown className="size-3" />
@@ -413,9 +460,15 @@ export function Composer() {
               </DropdownMenuContent>
             </DropdownMenu>
             <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{hint}</p>
-            <Button size="sm" className="h-8" onClick={send} disabled={!canSend} aria-label="Send">
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={send}
+              disabled={!canSend}
+              aria-label={searching ? "Search" : "Send"}
+            >
               {sending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
-              Send
+              {searching ? "Search" : "Send"}
             </Button>
           </div>
         </div>

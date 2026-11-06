@@ -18,6 +18,7 @@ import type {
   Seat,
   SendMode,
   Source,
+  WebAccess,
   WrapKind,
 } from "@homestorm/shared";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -90,6 +91,7 @@ export function toSeat(r: SeatRow): Seat {
     reasoningEffort: r.reasoningEffort as ReasoningEffort,
     answerLength: r.answerLength as AnswerLength | null,
     contextBudget: r.contextBudget as ContextBudget | null,
+    webAccess: r.webAccess as WebAccess,
     removedAt: iso(r.removedAt),
     createdAt: r.createdAt.toISOString(),
   };
@@ -140,6 +142,7 @@ export function toMessage(r: MessageRow, files: AttachmentMeta[] = []): Message 
     trimmedCount: r.trimmedCount,
     viewTokens: r.viewTokens,
     stoppedEarly: r.stoppedEarly,
+    toolCalls: r.toolCalls,
     createdAt: r.createdAt.toISOString(),
     startedAt: iso(r.startedAt),
     finishedAt: iso(r.finishedAt),
@@ -257,6 +260,7 @@ export function createStore(db: Database) {
       reasoningEffort: ReasoningEffort;
       answerLength?: AnswerLength | null;
       contextBudget?: ContextBudget | null;
+      webAccess?: WebAccess;
     }): Promise<Seat> {
       const [max] = await db
         .select({ value: sql<number>`coalesce(max(${seats.position}), -1)::int` })
@@ -307,6 +311,7 @@ export function createStore(db: Database) {
           | "reasoningEffort"
           | "answerLength"
           | "contextBudget"
+          | "webAccess"
           | "position"
           | "removedAt"
         >

@@ -15,12 +15,15 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
   you asked for and never falls back to another.
 - **One shared transcript, a separate view for each seat.** A model's own messages are `assistant`; everyone else's,
   the chair included, are `user` with a speaker tag.
+- **Web tools come through mcpgw,** the home tool gateway. The chair can post a search every seat reads, and seats the
+  chair allows can search and read pages themselves, with their sources shown under each answer.
 - **The chair runs it:** blind rounds (independent answers), in-turn rounds (discussion), @mentions, replies to a
   specific message, mute, stop and retry, wrap up into minutes.
 
 ## Develop locally
 
-Needs Node 22+, pnpm 10 and Docker, plus llmgw reachable at `http://llmgw.arch.internal`.
+Needs Node 22+, pnpm 10 and Docker, plus llmgw reachable at `http://llmgw.arch.internal`. mcpgw at
+`http://mcpgw.arch.internal` is optional: without `MCPGW_URL`, the web features are off and everything else works.
 
 ```sh
 pnpm install
@@ -90,6 +93,6 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0011](docs/adr/0011-one-admin-login.md) | One admin login with Better Auth, created at first-run setup |
 | [0012](docs/adr/0012-long-meetings-answer-length-effort.md) | Long meetings trimmed per seat; Concise / Detailed; per-seat thinking effort |
 | [0013](docs/adr/0013-intro-and-floor-note-templates.md) | Intro and floor-note templates fixed in code |
-| [0014](docs/adr/0014-tools-through-mcpgw.md) | Tools (web search first) come from mcpgw, the tool gateway; homestorm runs the tool loop. Not built yet |
+| [0014](docs/adr/0014-tools-through-mcpgw.md) | Tools (web search and page reading) come from mcpgw, the tool gateway; homestorm runs the tool loop, and enforces which URLs a seat may read |
 | [0015](docs/adr/0015-meeting-brief-and-full-context-policy.md) | A meeting brief every seat always sees; when a view is full, keep the start, the latest posted wrap-up and the newest turns |
 | [0016](docs/adr/0016-attachments-images-and-text-files.md) | Images and text files on messages and the brief: thumbnails, a full-size viewer, inline text files, image tokens in budgets |

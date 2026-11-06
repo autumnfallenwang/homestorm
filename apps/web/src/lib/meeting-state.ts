@@ -55,6 +55,12 @@ export function applyEvent(live: LiveState, event: MeetingEvent, now = Date.now(
       return { live: { state: { ...s, messages }, thinking }, gap: false };
     }
 
+    case "text_reset": {
+      const messages = s.messages.map((x) =>
+        x.id === event.messageId ? { ...x, content: "" } : x,
+      );
+      return { live: { ...live, state: { ...s, messages } }, gap: false };
+    }
     case "delta": {
       const m = s.messages.find((x) => x.id === event.messageId);
       if (!m) return { live, gap: true };

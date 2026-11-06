@@ -1,12 +1,13 @@
 "use client";
 
-import { type Message, type Round, stripSpeakerTag } from "@homestorm/shared";
+import { type Message, type Round, stripSpeakerTag, type ToolActivity } from "@homestorm/shared";
 import {
   AlertTriangle,
   Check,
   Copy,
   CornerUpLeft,
   FileText,
+  Globe,
   Loader2,
   RotateCcw,
   Square,
@@ -132,6 +133,7 @@ function MessageItem({ message, inRound = false }: { message: Message; inRound?:
     return <p className="text-center text-xs text-muted-foreground">{message.content}</p>;
   }
   if (message.authorKind === "brief") return <BriefLine message={message} />;
+  if (message.authorKind === "sources") return <SourcesMessage message={message} />;
   if (message.authorKind === "chair") return <ChairMessage message={message} />;
   return <SeatMessage message={message} inRound={inRound} />;
 }
@@ -211,13 +213,18 @@ function SeatMessage({ message, inRound }: { message: Message; inRound: boolean 
     );
   }
 
+  const toolRunning = message.toolCalls.find((c) => c.status === "running");
   const status =
     message.status === "queued"
       ? "Next"
       : streaming
-        ? isThinking
-          ? "Thinking…"
-          : "Answering…"
+        ? toolRunning
+          ? toolRunning.tool === "web_search"
+            ? "Searching…"
+            : "Reading…"
+          : isThinking
+            ? "Thinking…"
+            : "Answering…"
         : null;
 
   return (
@@ -271,12 +278,86 @@ function SeatMessage({ message, inRound }: { message: Message; inRound: boolean 
           <div className="mt-2 h-4 w-1/3 animate-pulse rounded bg-muted" />
         ) : null}
 
+        <ToolCalls calls={message.toolCalls} />
         <Problem message={message} />
         <PostWrapUp message={message} />
 
         {(message.status === "done" || message.status === "stopped") && (
           <MetaLine message={message} />
         )}
+      </div>
+    </article>
+  );
+}
+
+/** Plain text, not a link, unless the fetch really happened: a refused address may be what a page tried to send. */
+function ToolCall({ call }: { call: ToolActivity }) {
+  const searching = call.tool === "web_search";
+  if (call.status === "running") {
+    return <>{searching ? `Searching: "${call.input}"…` : `Reading: ${call.input}…`}</>;
+  }
+  if (call.status === "refused") {
+    return <span className="text-warn">Refused: {call.input} · not from you or a search</span>;
+  }
+  if (call.status === "failed") {
+    return (
+      <span className="text-warn">
+        {searching ? `Search failed: "${call.input}"` : `Couldn't read: ${call.input}`}
+      </span>
+    );
+  }
+  if (searching) return <>Searched: "{call.input}"</>;
+  const web = /^https?:\/\//i.test(call.input);
+  return (
+    <>
+      Read:{" "}
+      {web ? (
+        <a
+          href={call.input}
+          target="_blank"
+          rel="noreferrer noopener nofollow"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          {call.title || call.input}
+        </a>
+      ) : (
+        call.input
+      )}
+    </>
+  );
+}
+
+/** What a seat looked up (ADR 0014). Some models repeat a weak source as fact, so the chair always sees them. */
+function ToolCalls({ calls }: { calls: ToolActivity[] }) {
+  if (!calls.length) return null;
+  return (
+    <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground" aria-label="Web tools used">
+      {calls.map((call, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a turn's calls only ever grow at the end
+        <li key={i} className="flex min-w-0 items-start gap-1.5">
+          <Globe className="mt-0.5 size-3 shrink-0" />
+          <span className="min-w-0 break-words">
+            <ToolCall call={call} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The chair's web search (ADR 0014): one message every seat reads. */
+function SourcesMessage({ message }: { message: Message }) {
+  return (
+    <article aria-label="Web search results" className="rounded-lg border bg-muted/40 px-3 py-2">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <Globe className="size-3.5 text-muted-foreground" />
+        <span className="text-sm font-semibold">Web search</span>
+        <span className="text-xs text-muted-foreground">
+          every seat reads this · {clockTime(message.createdAt)}
+        </span>
+      </header>
+      <div className="mt-1">
+        <Markdown text={message.content} />
       </div>
     </article>
   );

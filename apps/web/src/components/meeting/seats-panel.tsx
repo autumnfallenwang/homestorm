@@ -104,6 +104,8 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
             {seat.contextBudget &&
               seat.contextBudget !== "standard" &&
               ` · ${BUDGET_LABEL[seat.contextBudget]} context`}
+            {seat.webAccess === "on" && " · web tools"}
+            {seat.webAccess === "must" && " · searches first"}
           </p>
         </div>
         <span className={cn("shrink-0 text-xs font-medium", STATUS_TONE[status])}>{status}</span>

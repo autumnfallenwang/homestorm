@@ -8,6 +8,7 @@ import {
   type Seat,
   seatNameClash,
   seatNameClashMessage,
+  type WebAccess,
 } from "@homestorm/shared";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -34,15 +35,17 @@ import { api } from "@/lib/api";
 import { AnswerLengthSelect } from "./answer-length-select";
 import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
+import { WebAccessSelect } from "./web-access-select";
 
 /** Edit name, persona, thinking effort, answer length and context budget. The model can't change: that would be a different seat. */
 export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: () => void }) {
-  const { id, state, act, models, standardContextBudget } = useRoom();
+  const { id, state, act, models, standardContextBudget, webTools } = useRoom();
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
+  const [web, setWeb] = useState<WebAccess>("off");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -52,6 +55,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
       setEffort(seat.reasoningEffort);
       setLength(seat.answerLength);
       setBudget(seat.contextBudget);
+      setWeb(seat.webAccess);
     }
   }, [seat]);
 
@@ -68,6 +72,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
         reasoningEffort: effort,
         answerLength: length,
         contextBudget: budget,
+        webAccess: web,
       }),
     );
     setBusy(false);
@@ -139,6 +144,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
             )}
             standard={standardContextBudget}
           />
+          {(webTools || web !== "off") && <WebAccessSelect value={web} onChange={setWeb} />}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

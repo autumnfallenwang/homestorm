@@ -42,6 +42,7 @@ const msg = (extra: Partial<Message>): Message => ({
   viewTokens: null,
   attachments: [],
   stoppedEarly: false,
+  toolCalls: [],
   createdAt: "2026-11-02T00:00:00.000Z",
   startedAt: null,
   finishedAt: null,
@@ -70,6 +71,7 @@ const state = (messages: Message[]): MeetingState => ({
       reasoningEffort: "low",
       answerLength: null,
       contextBudget: null,
+      webAccess: "off",
       removedAt: null,
       createdAt: "",
     },
@@ -350,5 +352,31 @@ describe("seatContext", () => {
       last: 100_000,
       tone: "warn",
     });
+  });
+});
+
+describe("text_reset (ADR 0014)", () => {
+  it("clears what a seat said before a tool call, so the answer's deltas start from nothing", () => {
+    const m = { id: "m1", seq: 1, content: "", status: "streaming" } as Message;
+    const state = {
+      meeting: { id: "x" },
+      seats: [],
+      rounds: [],
+      messages: [],
+    } as unknown as MeetingState;
+    let live = applyEvent(emptyLive, { type: "snapshot", state }).live;
+    live = applyEvent(live, { type: "message", message: m }).live;
+    live = applyEvent(live, {
+      type: "delta",
+      messageId: "m1",
+      offset: 0,
+      text: "Let me check…",
+    }).live;
+    expect(live.state?.messages[0]?.content).toBe("Let me check…");
+    live = applyEvent(live, { type: "text_reset", messageId: "m1" }).live;
+    expect(live.state?.messages[0]?.content).toBe("");
+    const after = applyEvent(live, { type: "delta", messageId: "m1", offset: 0, text: "Answer" });
+    expect(after.gap).toBe(false);
+    expect(after.live.state?.messages[0]?.content).toBe("Answer");
   });
 });

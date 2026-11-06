@@ -11,6 +11,8 @@ export interface Room {
   models: Map<string, ModelInfo>;
   /** The Standard context budget; null until the model list has loaded. */
   standardContextBudget: number | null;
+  /** mcpgw answers, so the web features can be offered (ADR 0014). */
+  webTools: boolean;
   thinking: Record<string, number>;
   /** A round is running: new questions wait. */
   running: boolean;

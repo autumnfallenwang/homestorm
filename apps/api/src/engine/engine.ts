@@ -23,6 +23,7 @@ import {
   type SendAction,
   seatAnswerLength,
   stripSpeakerTag,
+  type ToolActivity,
   type WrapKind,
 } from "@homestorm/shared";
 import { log } from "../lib/logger.js";
@@ -32,17 +33,36 @@ import {
   type PreparedAttachment,
   prepareAttachments,
 } from "../services/attachments.js";
-import { type LlmClient, toLlmError } from "../services/llmgw.js";
+import {
+  type ChatTurn,
+  type LlmClient,
+  type ToolCall,
+  type ToolDefinition,
+  toLlmError,
+} from "../services/llmgw.js";
+import type { ToolClient } from "../services/mcpgw.js";
 import type { AttachmentWithData, MessagePatch, Store } from "../services/store.js";
 import type { EventHub } from "./hub.js";
 import type { Floor, ReplyTarget } from "./prompts.js";
 import { displayTokens } from "./tokens.js";
+import {
+  allowedUrls,
+  canonicalUrl,
+  FORCED_SEARCH,
+  LIMIT_REACHED,
+  MAX_TOOL_CALLS_PER_TURN,
+  readToolCall,
+  researchNote,
+  searchUrls,
+  sourcesContent,
+  URL_REFUSED,
+} from "./tools.js";
 import { buildView, textOf, type ViewAttachment } from "./view.js";
 
 /** A refused action, mapped onto an HTTP status by the routes. */
 export class EngineError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 404 | 409 | 502 | 503,
     message: string,
   ) {
     super(message);
@@ -61,6 +81,8 @@ export interface EngineOptions {
   store: Store;
   llm: LlmClient;
   hub: EventHub;
+  /** mcpgw (ADR 0014). Without it the web features are off, and everything else works as usual. */
+  tools?: ToolClient | null;
   /** Most tokens one seat's view may use (ADR 0012). */
   viewTokenBudget: number;
   /** How often streamed text is written to Postgres (ms). It's in memory on every chunk. */
@@ -93,6 +115,7 @@ export class Engine {
   private readonly store: Store;
   private readonly llm: LlmClient;
   private readonly hub: EventHub;
+  private readonly tools: ToolClient | null;
   private readonly budget: number;
   private readonly flushIntervalMs: number;
   /** meeting id → its running round. */
@@ -106,6 +129,7 @@ export class Engine {
     this.store = opts.store;
     this.llm = opts.llm;
     this.hub = opts.hub;
+    this.tools = opts.tools ?? null;
     this.budget = opts.viewTokenBudget;
     this.flushIntervalMs = opts.flushIntervalMs ?? 500;
   }
@@ -178,7 +202,8 @@ export class Engine {
       if (
         replyTo?.status !== "done" ||
         replyTo.authorKind === "event" ||
-        replyTo.authorKind === "brief"
+        replyTo.authorKind === "brief" ||
+        replyTo.authorKind === "sources"
       ) {
         throw new EngineError(400, "That message can't be replied to.");
       }
@@ -207,6 +232,49 @@ export class Engine {
       hidden: false,
     });
     return { message, round };
+  }
+
+  /**
+   * The chair's "Search the web" (ADR 0014): no model decides anything. The results enter the record as one message
+   * every seat reads, which keeps blind rounds fair. Like a comment, it can be posted while a round runs: seats already
+   * answering keep their cutoff and don't see it.
+   */
+  async search(meetingId: string, query: string): Promise<Message> {
+    await this.requireMeeting(meetingId);
+    if (!this.tools) throw new EngineError(503, "Web search isn't set up on this server.");
+    const requestId = `homestorm-${randomUUID()}`;
+    let found: Awaited<ReturnType<ToolClient["call"]>>;
+    try {
+      found = await this.tools.call("web_search", { query }, { requestId });
+    } catch (err) {
+      log.warn({ event: "chair.search_failed", request_id: requestId, err }, "chair search failed");
+      throw new EngineError(502, "Couldn't reach the web search service. Try again in a moment.");
+    }
+    if (found.isError) throw new EngineError(502, found.text);
+    const urls = searchUrls(found.meta);
+    if (!urls.length) throw new EngineError(400, found.text);
+
+    const visibleSeq = await this.store.bumpClock(meetingId);
+    const now = new Date();
+    const message = await this.store.insertMessage({
+      meetingId,
+      authorKind: "sources",
+      content: sourcesContent(query, found.meta),
+      status: "done",
+      visibleSeq,
+      toolCalls: [{ tool: "web_search", input: query, status: "ok", urls }],
+      requestId,
+      startedAt: now,
+      finishedAt: now,
+    });
+    await this.store.touchMeeting(meetingId);
+    this.emit(meetingId, { type: "message", message });
+    await this.emitMeeting(meetingId);
+    log.info(
+      { event: "chair.search", meeting_id: meetingId, request_id: requestId, results: urls.length },
+      "chair search posted",
+    );
+    return message;
   }
 
   /** Wrap up: one seat writes the minutes, a decision, or the open questions. */
@@ -646,6 +714,65 @@ export class Engine {
   }
 
   /** What the seat is told it's doing now, derived from its round (so a retry gets the same note). */
+  /** The tools to offer this seat this turn, or null. mcpgw being down isn't a reason to fail the turn. */
+  private async toolsFor(seat: Seat, floor: Floor): Promise<ToolDefinition[] | null> {
+    if (!this.tools || seat.webAccess === "off" || floor.kind === "wrap_up") return null;
+    try {
+      return await this.tools.list();
+    } catch (err) {
+      log.warn({ event: "tools.unavailable", seat_id: seat.id, err }, "answering without tools");
+      return null;
+    }
+  }
+
+  /** Runs one tool call. Whatever goes wrong becomes text the model can read, and the turn carries on. */
+  private async runToolCall(
+    call: ToolCall,
+    allowed: Set<string>,
+    opts: { requestId: string; signal: AbortSignal },
+  ): Promise<{ text: string; activity: ToolActivity }> {
+    const parsed = readToolCall(call);
+    if (!parsed.ok) {
+      return {
+        text: parsed.message,
+        activity: {
+          tool: parsed.tool,
+          input: parsed.input,
+          status: "failed",
+          detail: parsed.message,
+        },
+      };
+    }
+    const { tool, input, args } = parsed;
+    if (tool === "web_fetch" && !allowed.has(canonicalUrl(input) ?? "")) {
+      return {
+        text: URL_REFUSED,
+        activity: { tool, input, status: "refused", detail: "Not from the Chair or a search" },
+      };
+    }
+    try {
+      const out = await this.tools!.call(tool, args, opts);
+      if (out.isError) {
+        return { text: out.text, activity: { tool, input, status: "failed", detail: out.text } };
+      }
+      if (tool === "web_search") {
+        const urls = searchUrls(out.meta);
+        for (const url of urls) allowed.add(canonicalUrl(url) ?? url);
+        return { text: out.text, activity: { tool, input, status: "ok", urls } };
+      }
+      const title = typeof out.meta?.title === "string" ? out.meta.title : undefined;
+      return {
+        text: out.text,
+        activity: { tool, input, status: "ok", ...(title ? { title } : {}) },
+      };
+    } catch (err) {
+      if (opts.signal.aborted) throw err;
+      log.warn({ event: "tool.call_failed", tool, err }, "tool call failed");
+      const text = "The web tools aren't answering right now. Answer without them, and say so.";
+      return { text, activity: { tool, input, status: "failed", detail: "mcpgw didn't answer" } };
+    }
+  }
+
   private async floorFor(meetingId: string, round: Round, m: Message): Promise<Floor> {
     let replyTo: ReplyTarget | undefined;
     if (round.replyToId) {
@@ -726,7 +853,9 @@ export class Engine {
       seat.reasoningEffort,
       info?.maxTokens ?? null,
     );
+    const tools = await this.toolsFor(seat, floor);
     const view = buildView({
+      webTools: !!tools,
       meeting: state.meeting,
       seats: state.seats,
       messages: state.messages,
@@ -761,6 +890,7 @@ export class Engine {
       costUsd: null,
       llmgwReqId: null,
       stoppedEarly: false,
+      toolCalls: [],
     });
     log.info(
       {
@@ -783,6 +913,7 @@ export class Engine {
     let lastFlush = Date.now();
     let lastThinking = 0;
     let result: MessagePatch;
+    const activity: ToolActivity[] = [];
     try {
       let done: {
         usage: {
@@ -798,29 +929,118 @@ export class Engine {
         costUsd: null,
         llmgwReqId: null,
       };
-      for await (const ev of this.llm.stream({
-        model: seat.model,
-        messages: view.messages,
-        maxTokens: outputCap,
-        reasoningEffort: seat.reasoningEffort,
-        requestId,
-        signal: ac.signal,
-      })) {
-        if (ev.type === "text") {
-          this.emit(meetingId, { type: "delta", messageId, offset: text.length, text: ev.text });
-          text += ev.text;
-          this.live.set(messageId, text);
-          if (Date.now() - lastFlush >= this.flushIntervalMs) {
-            lastFlush = Date.now();
-            await this.store.updateMessage(messageId, { content: text });
+
+      // The tool loop (ADR 0014). Without tools, this runs once, exactly as it did before them.
+      const allowed = tools ? allowedUrls(state.messages) : new Set<string>();
+      const messages: ChatTurn["messages"] = [...view.messages];
+      const research: string[] = [];
+      let callsLeft = MAX_TOOL_CALLS_PER_TURN;
+      let completionTokens = 0;
+      let costUsd: number | null = null;
+      for (let step = 0; ; step++) {
+        const offer = tools && callsLeft > 0;
+        const stepMessages: ChatTurn["messages"] =
+          offer || !research.length
+            ? messages
+            : // The forced final answer, once the calls are used up: the research as plain text, and no tools. With
+              // `tool_choice: "none"`, DeepSeek wrote its raw tool markup into the answer and Claude Opus returned no
+              // text. Nothing here is tool state, so no provider has anything to mishandle.
+              [...view.messages, { role: "user", content: researchNote(research) }];
+        let toolCalls: ToolCall[] = [];
+        for await (const ev of this.llm.stream({
+          model: seat.model,
+          messages: stepMessages,
+          maxTokens: outputCap,
+          reasoningEffort: seat.reasoningEffort,
+          requestId,
+          signal: ac.signal,
+          ...(offer
+            ? {
+                tools: tools ?? [],
+                toolChoice:
+                  step === 0 && seat.webAccess === "must" ? FORCED_SEARCH : ("auto" as const),
+              }
+            : {}),
+        })) {
+          if (ev.type === "text") {
+            this.emit(meetingId, { type: "delta", messageId, offset: text.length, text: ev.text });
+            text += ev.text;
+            this.live.set(messageId, text);
+            if (Date.now() - lastFlush >= this.flushIntervalMs) {
+              lastFlush = Date.now();
+              await this.store.updateMessage(messageId, { content: text });
+            }
+          } else if (ev.type === "thinking") {
+            if (Date.now() - lastThinking >= 1_000) {
+              lastThinking = Date.now();
+              this.emit(meetingId, { type: "thinking", messageId });
+            }
+          } else {
+            toolCalls = ev.toolCalls;
+            if (ev.usage) completionTokens += ev.usage.completionTokens;
+            if (ev.costUsd !== null) costUsd = (costUsd ?? 0) + ev.costUsd;
+            done = {
+              // One step reports what llmgw said, unchanged. Over several, the prompt is the last step's, since it
+              // holds the others, and the output is all of them.
+              usage:
+                ev.usage && step > 0
+                  ? {
+                      ...ev.usage,
+                      completionTokens,
+                      totalTokens: ev.usage.promptTokens + completionTokens,
+                    }
+                  : ev.usage,
+              costUsd,
+              llmgwReqId: ev.llmgwReqId,
+            };
           }
-        } else if (ev.type === "thinking") {
-          if (Date.now() - lastThinking >= 1_000) {
-            lastThinking = Date.now();
-            this.emit(meetingId, { type: "thinking", messageId });
+        }
+        if (ac.signal.aborted) break;
+        if (!offer || !toolCalls.length) break;
+
+        // Text before a tool call is only leading up to it ("I'll check…"). The answer is what comes after.
+        messages.push({
+          role: "assistant",
+          content: text || null,
+          tool_calls: toolCalls.map((c) => ({
+            id: c.id,
+            type: "function",
+            function: { name: c.name, arguments: c.arguments },
+          })),
+        });
+        text = "";
+        this.live.set(messageId, "");
+        this.emit(meetingId, { type: "text_reset", messageId });
+
+        for (const call of toolCalls) {
+          // Every call needs a result, or the provider refuses the next request.
+          if (callsLeft <= 0) {
+            messages.push({ role: "tool", tool_call_id: call.id, content: LIMIT_REACHED });
+            continue;
           }
-        } else {
-          done = ev;
+          callsLeft--;
+          const read = readToolCall(call);
+          activity.push({ tool: read.tool, input: read.input, status: "running" });
+          await this.patch(msg, { content: "", toolCalls: [...activity] });
+
+          const started = Date.now();
+          const ran = await this.runToolCall(call, allowed, { requestId, signal: ac.signal });
+          activity[activity.length - 1] = ran.activity;
+          messages.push({ role: "tool", tool_call_id: call.id, content: ran.text });
+          research.push(`${ran.activity.tool}: ${ran.activity.input}\n\n${ran.text}`);
+          await this.patch(msg, { toolCalls: [...activity] });
+          log.info(
+            {
+              event: "turn.tool",
+              ...fields,
+              request_id: requestId,
+              tool: ran.activity.tool,
+              status: ran.activity.status,
+              duration_ms: Date.now() - started,
+              calls_left: callsLeft,
+            },
+            "seat used a tool",
+          );
         }
       }
       // A stream that ended because we aborted it is a stop, however the client reported it.
@@ -877,7 +1097,12 @@ export class Engine {
       this.live.delete(messageId);
     }
 
-    const final = await this.patch(msg, result);
+    // A stop or an error can land while a call runs. It's not running any more.
+    const toolCalls = activity.map(
+      (c): ToolActivity =>
+        c.status === "running" ? { ...c, status: "failed", detail: "Stopped" } : c,
+    );
+    const final = await this.patch(msg, { ...result, toolCalls });
     if (final.visibleSeq !== null) await this.emitMeeting(meetingId);
     const level = final.status === "error" ? "warn" : "info";
     log[level](
@@ -889,6 +1114,7 @@ export class Engine {
         ...(final.error ? { error_code: final.error.code, error_status: final.error.status } : {}),
         duration_ms: Date.now() - startedAt.getTime(),
         chars: final.content.length,
+        tool_calls: toolCalls.length,
         usage_estimated: final.usage?.estimated,
         llmgw_req_id: final.llmgwReqId ?? undefined,
       },

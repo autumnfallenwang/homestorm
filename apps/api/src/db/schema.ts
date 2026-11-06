@@ -4,7 +4,7 @@
 // (`casing: "snake_case"` in drizzle.config.ts and db/index.ts), status values as plain text checked by Zod and a
 // CHECK constraint, timestamps with time zone.
 
-import type { MessageError, Usage } from "@homestorm/shared";
+import type { MessageError, ToolActivity, Usage } from "@homestorm/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -112,6 +112,8 @@ export const seats = pgTable(
     answerLength: text(),
     // How much of the meeting its view may hold: small / standard / large / full; null is standard (ADR 0012).
     contextBudget: text(),
+    // What it may do on the web: off / on / must (ADR 0014).
+    webAccess: text().notNull().default("off"),
     // Removed seats stay, so their earlier messages keep a name in every view.
     removedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
@@ -125,6 +127,7 @@ export const seats = pgTable(
       "seats_context_budget_valid",
       sql`${t.contextBudget} IN ('small', 'standard', 'large', 'full')`,
     ),
+    check("seats_web_access_valid", sql`${t.webAccess} IN ('off', 'on', 'must')`),
   ],
 );
 
@@ -191,6 +194,8 @@ export const messages = pgTable(
     // The view's size by the budget estimate when the turn started.
     viewTokens: integer(),
     stoppedEarly: boolean().notNull().default(false),
+    // Tool calls during this turn, or the search behind a `sources` message (ADR 0014).
+    toolCalls: jsonb().$type<ToolActivity[]>().notNull().default([]),
     createdAt: createdAt(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -200,7 +205,7 @@ export const messages = pgTable(
     index("messages_round_idx").on(t.roundId),
     check(
       "messages_author_kind_valid",
-      sql`${t.authorKind} IN ('chair', 'seat', 'event', 'brief')`,
+      sql`${t.authorKind} IN ('chair', 'seat', 'event', 'brief', 'sources')`,
     ),
     check(
       "messages_status_valid",

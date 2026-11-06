@@ -8,6 +8,7 @@ import { EventHub } from "./engine/hub.js";
 import { log } from "./lib/logger.js";
 import { meetingRoutes } from "./routes/meetings.js";
 import { createLlmgwClient } from "./services/llmgw.js";
+import { createMcpgwClient } from "./services/mcpgw.js";
 import { createStore } from "./services/store.js";
 
 // ★ A crash is one JSON line at `fatal`, not a stack printed across dozens of Loki entries. Exit either way: state
@@ -35,7 +36,8 @@ if (!config.betterAuthSecret) {
 const store = createStore(db);
 const hub = new EventHub();
 const llm = createLlmgwClient(config.llmgwUrl);
-const engine = new Engine({ store, llm, hub, viewTokenBudget: config.viewTokenBudget });
+const tools = config.mcpgwUrl ? createMcpgwClient(config.mcpgwUrl) : null;
+const engine = new Engine({ store, llm, hub, tools, viewTokenBudget: config.viewTokenBudget });
 
 // Boot work runs before the port opens, so an unreachable DB is one `server.boot_failed` line and a restart.
 try {
@@ -49,12 +51,17 @@ try {
 }
 
 const app = createApp({
-  mount: (a) => a.route("/api", meetingRoutes({ engine, store, llm, hub })),
+  mount: (a) => a.route("/api", meetingRoutes({ engine, store, llm, hub, tools })),
 });
 
 const server = serve({ fetch: app.fetch, port: config.apiPort }, (info) => {
   log.info(
-    { event: "server.start", port: info.port, llmgw_url: config.llmgwUrl },
+    {
+      event: "server.start",
+      port: info.port,
+      llmgw_url: config.llmgwUrl,
+      mcpgw_url: config.mcpgwUrl,
+    },
     "api server listening",
   );
 });

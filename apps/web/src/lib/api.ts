@@ -62,6 +62,8 @@ export interface ModelsResponse {
   families: Partial<Record<Source, Limits | null>>;
   /** The Standard context budget (the server's VIEW_TOKEN_BUDGET). */
   standardContextBudget: number;
+  /** mcpgw answers, so the web features can be offered (ADR 0014). */
+  webTools: boolean;
 }
 
 export const api = {
@@ -100,6 +102,9 @@ export const api = {
       `/api/meetings/${id}/actions`,
       action,
     ),
+  /** The chair's "Search the web": the results are posted as one message every seat reads. */
+  search: (id: string, query: string) =>
+    request<Message>("POST", `/api/meetings/${id}/search`, { query }),
   wrapUp: (id: string, input: WrapUpInput) =>
     request<Round>("POST", `/api/meetings/${id}/wrap-up`, input),
   stop: (id: string, messageId?: string) =>
