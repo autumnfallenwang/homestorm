@@ -22,7 +22,7 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     `mcpgw` client, `engine/tools.ts`, the loop in `runTurn`, `POST /meetings/:id/search`, the seat setting, the Sources
     card, the tool line under answers, and the export.
   - **Checked:**
-    - 133 API tests, including 30 new ones on the loop and the URL rule, and 19 web tests;
+    - 133 API tests and 19 web tests, with 53 new test cases on the loop, the URL rule, the client and the rendering;
     - a real meeting in a real browser on localhost, against the real llmgw and mcpgw, in a throwaway database. A chair
       search; then a blind round with DeepSeek Flash, GPT-5.6 Luna ("must search") and Claude Haiku 5.5 all searching,
       reading and citing up to the limit, with DeepSeek V4 Pro (tools off) answering from the chair's search. All of them
@@ -31,6 +31,8 @@ A dated log of what was done and decided, newest first. The plan and milestone s
       it in amber, and the seat said honestly that it couldn't read the page. A seat told to write a Markdown image got
       `[image: chart]`, with no `<img>` and no request sent. mcpgw's logs show 16 calls from homestorm with per-turn IDs,
       and the refused address never arrived.
+  - **On the cluster:** the images deployed and the migration landed, with all 3 meetings and 42 messages intact. homestorm's
+    real client searched through mcpgw from its pod, and had a fetch of llmgw refused by name.
   - **Not checked on the cluster with a real meeting:** that needs the admin login. It's the user's to try.
 
 ## 2026-11-04
