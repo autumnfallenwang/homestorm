@@ -12,7 +12,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   /** The home LLM gateway (ADR 0002). */
-  llmgwUrl: process.env.LLMGW_URL ?? "http://llmgw.arch.internal",
+  llmgwUrl: process.env.LLMGW_URL ?? "http://llmgw.llmgw.svc.cluster.local",
   /** The home tool gateway (ADR 0014). Unset, the web features are off and everything else works as usual. */
   mcpgwUrl: process.env.MCPGW_URL?.trim() || null,
   /** Most tokens one seat's view may use per turn (ADR 0012). */

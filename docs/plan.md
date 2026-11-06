@@ -140,7 +140,7 @@ v1 is done. Next candidates are in "Out (later)" above.
 ### M9: Tools through mcpgw ✅
 
 Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw**, the home cluster's tool gateway
-(`~/agentic/mcpgw`, http://mcpgw.arch.internal); homestorm runs the tool loop.
+(`~/agentic/mcpgw`, http://mcpgw.mcpgw.svc.cluster.local); homestorm runs the tool loop.
 
 - [x] **Prerequisite:** mcpgw built and deployed
 - [x] **The date in the intro:** "Today is …; your training data may be older."

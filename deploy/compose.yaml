@@ -36,6 +36,9 @@ services:
     depends_on:
       homestorm-db-prod:
         condition: service_healthy
+    # A container doesn't read arch's /etc/hosts, so it gets the same mapping here.
+    extra_hosts:
+      - llmgw.llmgw.svc.cluster.local:10.43.151.52
     environment:
       - API_PORT=52001
       - DATABASE_URL=postgresql://homestorm:homestorm@localhost:52432/homestorm
@@ -44,7 +47,7 @@ services:
       # session cookie stays host-only and still reaches both ports.
       - BETTER_AUTH_SECRET=local-compose-only-not-a-real-secret-0123456789
       - BETTER_AUTH_URL=http://localhost:52001
-      - LLMGW_URL=http://llmgw.arch.internal
+      - LLMGW_URL=http://llmgw.llmgw.svc.cluster.local
       - LOG_LEVEL=info
     logging:
       driver: json-file

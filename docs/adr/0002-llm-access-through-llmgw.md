@@ -12,7 +12,7 @@ The chair needs to trust that each reply came from the model shown: no silent su
 
 ## Decision
 
-- **Single entry point:** homestorm calls models **only** through llmgw (`http://llmgw.arch.internal`), never a
+- **Single entry point:** homestorm calls models **only** through llmgw (`http://llmgw.llmgw.svc.cluster.local`), never a
   provider directly. That includes DeepSeek, which llmgw now serves.
 - **Sources** (llmgw's `owned_by`):
   - `anthropic`: Claude, on the Claude subscription;

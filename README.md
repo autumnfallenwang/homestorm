@@ -22,8 +22,10 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
 
 ## Develop locally
 
-Needs Node 22+, pnpm 10 and Docker, plus llmgw reachable at `http://llmgw.arch.internal`. mcpgw at
-`http://mcpgw.arch.internal` is optional: without `MCPGW_URL`, the web features are off and everything else works.
+Needs Node 22+, pnpm 10 and Docker, plus llmgw at `http://llmgw.llmgw.svc.cluster.local`. mcpgw at
+`http://mcpgw.mcpgw.svc.cluster.local` is optional: without `MCPGW_URL`, the web features are off and everything else works.
+Both gateways are only reachable from inside the cluster and from arch, where `/etc/hosts` points those names at their
+Service IPs, so local development happens on arch.
 
 ```sh
 pnpm install
