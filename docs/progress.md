@@ -4,6 +4,13 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-07
+
+- **Seats get 6 web calls per turn, up from 4.** In a real meeting on the cluster, all six answers used all 4, and in the second round no
+  seat could open a news article.
+- **Links stop at Chinese punctuation,** in answers and in the rule on which URLs seats may read. A bare link ran on into the sentence after
+  it and went nowhere. Where a Chair's link runs straight into Chinese letters, there's no telling where it ends, so both forms are allowed.
+
 ## 2026-11-05
 
 - **M9 done: web tools through mcpgw** ([ADR 0014](adr/0014-tools-through-mcpgw.md)). The date in the intro, the chair's

@@ -32,8 +32,8 @@ homestorm calls it with `@modelcontextprotocol/client`, and converts tools to Op
    into the record as one "Sources" message. No model decides anything, and every seat reads the same sources, so
    blind rounds stay fair.
 3. **Seat tools.** A seat setting: off, "Can search and read pages", or "Must search before answering". homestorm passes
-   mcpgw's tools to llmgw for that seat only, runs each tool call on mcpgw, and returns the result, up to 4 calls per
-   turn. Under the answer: "Searched: … · Read: …"; the sources enter the record.
+   mcpgw's tools to llmgw for that seat only, runs each tool call on mcpgw, and returns the result, up to 6 calls per
+   turn (first 4; raised on 2026-11-07 after every answer in a real meeting used all 4 and none could open a news article). Under the answer: "Searched: … · Read: …"; the sources enter the record.
 
 **Three rules came out of testing with real models:**
 

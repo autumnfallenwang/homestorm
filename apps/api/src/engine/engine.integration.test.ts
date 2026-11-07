@@ -741,18 +741,25 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         toolCalls: [toolCall("web_search", { query: `q${n}` }, `id-${n}`)],
       });
 
-      it("stops at 4 calls, then asks for an answer with no tools and no tool messages", async () => {
+      it("stops at the limit, then asks for an answer with no tools and no tool messages", async () => {
         const w = await world();
         await enable(w.gpt);
-        w.llm.on(w.gpt.model, searching(1), searching(2), searching(3), searching(4), {
-          chunks: ["From what I found."],
-        });
+        w.llm.on(
+          w.gpt.model,
+          searching(1),
+          searching(2),
+          searching(3),
+          searching(4),
+          searching(5),
+          searching(6),
+          { chunks: ["From what I found."] },
+        );
         await ask(w, w.gpt);
         await w.engine.waitIdle(w.meeting.id);
-        expect(w.tools.calls).toHaveLength(4);
+        expect(w.tools.calls).toHaveLength(6);
         const turns = w.llm.callsFor(w.gpt.model);
-        expect(turns).toHaveLength(5);
-        const final = turns[4] as ChatTurn;
+        expect(turns).toHaveLength(7);
+        const final = turns[6] as ChatTurn;
         // No tool state for a provider to mishandle: this is what stopped DeepSeek's raw markup leaking.
         expect(final.tools).toBeUndefined();
         expect(final.toolChoice).toBeUndefined();
@@ -761,21 +768,21 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         const research = String(final.messages.at(-1)?.content);
         expect(research).toContain("no more tool calls");
         expect(research).toContain("web_search: q1");
-        expect(research).toContain("web_search: q4");
+        expect(research).toContain("web_search: q6");
         expect((await lastMessage(w)).content).toBe("From what I found.");
       });
 
       it("answers every call in a batch that goes over the limit, but doesn't run the extras", async () => {
         const w = await world();
         await enable(w.gpt);
-        const many = [1, 2, 3, 4, 5, 6].map((n) =>
+        const many = [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
           toolCall("web_search", { query: `q${n}` }, `id-${n}`),
         );
         w.llm.on(w.gpt.model, { chunks: [], toolCalls: many }, { chunks: ["Answer."] });
         await ask(w, w.gpt);
         await w.engine.waitIdle(w.meeting.id);
-        expect(w.tools.calls).toHaveLength(4);
-        expect((await lastMessage(w)).toolCalls).toHaveLength(4);
+        expect(w.tools.calls).toHaveLength(6);
+        expect((await lastMessage(w)).toolCalls).toHaveLength(6);
         expect((await lastMessage(w)).content).toBe("Answer.");
       });
 

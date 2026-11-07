@@ -26,6 +26,20 @@ describe("urlsIn", () => {
     ["(see https://en.wikipedia.org/wiki/Foo_(bar))", ["https://en.wikipedia.org/wiki/Foo_(bar)"]],
     ["**https://a.example/x**", ["https://a.example/x"]],
     ["no links, not ftp://a.example/ either", []],
+    ["读取 https://a.example/x（仅摘要）；然后", ["https://a.example/x"]],
+    ["请看https://a.example/x。", ["https://a.example/x"]],
+    ["“https://a.example/x”，谢谢", ["https://a.example/x"]],
+    [
+      "请读取https://a.example/x并总结",
+      ["https://a.example/x%E5%B9%B6%E6%80%BB%E7%BB%93", "https://a.example/x"],
+    ],
+    [
+      "https://zh.wikipedia.org/wiki/分支预测",
+      [
+        "https://zh.wikipedia.org/wiki/%E5%88%86%E6%94%AF%E9%A2%84%E6%B5%8B",
+        "https://zh.wikipedia.org/wiki/",
+      ],
+    ],
   ])("%s", (text, expected) => {
     expect(urlsIn(text)).toEqual(expected);
   });
