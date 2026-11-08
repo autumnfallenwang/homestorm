@@ -196,7 +196,7 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
   its own setting, as with answer length; changes add an event line
 - [x] **Migration:** seats that had web tools off now follow the room rule, which starts as off; seats that had them
   on keep that as their own. Checked on a copy of the live data
-- [ ] **Deployed**
+- [x] **Deployed** as `539daf2`: the migration ran at API start, with the same counts as on the copy
 
 ### Settings, 2026-11-08 ([ADR 0018](adr/0018-settings-profile-and-appearance.md))
 
@@ -205,7 +205,7 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 - [x] **Profile:** name and sign-in email (`PATCH /api/me`), and the password, moved here from its dialog
 - [x] **Appearance, per browser:** homework's palettes (Default, Solarized, Nord, Dracula, High contrast), Light /
   Dark / System, and a size from 75 to 150%. Applied before the first paint, so dark mode doesn't flash white
-- [ ] **Deployed**
+- [x] **Deployed** as `539daf2`
 
 ### Next, in order
 

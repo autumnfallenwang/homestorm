@@ -6,6 +6,17 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Both changes below deployed as `539daf2`** (CI green; image tags updated by hand in arch-infra `79048f6`, since
+  `ARCH_INFRA_TOKEN` is still unset).
+  - **Migration 0007 ran at API start on the live database.** 13 seats follow the room rule, 9 keep "on", the 6
+    meetings start Off, and all 76 messages are there, the same as on the copy. A backup from just before is on the
+    cluster: `homestorm-20261108T062747Z.dump`.
+  - **The live app:** API `/health` ok, its logs all JSON. `/settings/profile` and `/settings/appearance` are served,
+    with the appearance script in `<head>`. The bundles have the new text and no "Search the web".
+  - **Seen, not caused by this:** Argo CD shows the `homestorm-db` StatefulSet OutOfSync. Its spec hasn't changed
+    since 2026-11-03 (generation 1) and the chart didn't change, so it's an older diff, still to look at. The database
+    container restarted at 05:38 UTC when the host rebooted, and shut down cleanly.
+
 - **Settings, with Profile and Appearance** ([ADR 0018](adr/0018-settings-profile-and-appearance.md)). Asked for by the
   user, modeled on homework's settings, with Change password moved into Profile.
   - **The area:** `/settings`, with its own sidebar (Back to meetings, Profile, Appearance) that is an icon rail on
