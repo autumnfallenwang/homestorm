@@ -20,8 +20,10 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     - dumps written and pruned to the newest few, with other files left alone;
     - a wrong password gave `backup.failed` and left no partial file;
     - a meeting deleted by mistake came back with its messages, seats and the migrations table, and the app read it.
-  - **Checked against the cluster:** the CronJob, volume and ConfigMap pass a server dry run, and so does the script's
-    pod. **Not deployed yet.**
+  - **On the cluster** (`63b39e9`, deployed on the user's "go push"): the first backup, taken with `backup.sh now`, was
+    83,540 bytes. `list` showed it, `fetch` brought it here, and it restored into a scratch database with the same 6
+    meetings and 75 messages as the live one. Argo CD shows homestorm Healthy once the volume is attached. The first
+    nightly run is at 03:30.
   - **Still open:** it's on the same disk as the database, so it covers mistakes, not a lost disk. Where an off-machine
     copy goes is the user's call.
 - **UI, at the user's request:**
@@ -37,6 +39,7 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **Checked** in a real browser against a throwaway database, at desktop and phone width: the brief panel with a
     40-line brief, Add brief, folding and the reload that keeps it, Cancel, deleting another meeting, and deleting the
     open one. 132 fast tests pass.
+  - **Deployed** with the backup (`63b39e9`): CI green, tags bumped by hand in arch-infra, and the new web bundle served.
 - **Seats get 6 web calls per turn, up from 4.** In a real meeting on the cluster, all six answers used all 4, and in the second round no
   seat could open a news article.
 - **Links stop at Chinese punctuation,** in answers and in the rule on which URLs seats may read. A bare link ran on into the sentence after

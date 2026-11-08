@@ -180,7 +180,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 - [x] **Nightly backup:** a `pg_dump` CronJob in the chart at 03:30, the newest 14 kept in their own volume, which
   Helm and Argo CD never delete. Same disk as the database, so it covers mistakes, not a lost disk. `scripts/backup.sh`
   lists, takes, fetches and restores them
-- [ ] **Backup on the cluster:** deploy, take the first one with `scripts/backup.sh now`, and fetch it back
+- [x] **Backup on the cluster:** deployed as `63b39e9`; the first one taken with `scripts/backup.sh now`, fetched back
+  and restored into a scratch database with the live counts
 - [ ] **By the user:** where an off-machine copy goes, if anywhere (`scripts/backup.sh fetch`)
 - [x] **The brief in the header:** Brief (or Add brief) left of Export, pinned under the header while shown
 - [x] **A ⋯ menu on each meeting in the list,** with Delete meeting… asked again inside the menu
