@@ -53,7 +53,8 @@ const SOURCE_TITLE: Record<Source, string> = {
 };
 
 /** Add a seat: models grouped by source with each source's allowance (ADR 0007). */
-export function AddSeatDialog() {
+/** `compact`: an icon-only button, for the folded seats rail. */
+export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
   const { id, state, act } = useRoom();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ModelsResponse | null>(null);
@@ -132,10 +133,22 @@ export function AddSeatDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-7">
-          <Plus className="size-3.5" />
-          Add seat
-        </Button>
+        {compact ? (
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-8"
+            aria-label="Add seat"
+            title="Add seat"
+          >
+            <Plus />
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="h-7">
+            <Plus className="size-3.5" />
+            Add seat
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg">
         <DialogHeader>

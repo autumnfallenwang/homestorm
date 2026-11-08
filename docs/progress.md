@@ -6,6 +6,37 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-07
 
+- **Nightly database backup** (the user's "go 1"). The database had no backup, and attachments live in it.
+  - **In the chart:** a CronJob at 03:30 New York time runs `pg_dump` with the database's own image, so the versions
+    always match, into a `homestorm-backup` volume. It keeps the newest 14. The volume is marked so Helm and Argo CD
+    never delete it.
+  - **Safe by construction:** a dump is written under a temporary name and must read back with `pg_restore --list`
+    before it counts. Old dumps are pruned only after a good one, so failing nights never empty the volume. Each run
+    logs one JSON line, `backup.done` or `backup.failed`.
+  - **`scripts/backup.sh`:** `list`, `now`, `fetch` (a copy to this machine, for an off-disk copy) and `restore` (one
+    transaction, then the API restarts). local-path folders are root-only on arch, so list and fetch use a short-lived
+    read-only pod.
+  - **Checked locally,** with the cluster's image and user (999) against a throwaway database:
+    - dumps written and pruned to the newest few, with other files left alone;
+    - a wrong password gave `backup.failed` and left no partial file;
+    - a meeting deleted by mistake came back with its messages, seats and the migrations table, and the app read it.
+  - **Checked against the cluster:** the CronJob, volume and ConfigMap pass a server dry run, and so does the script's
+    pod. **Not deployed yet.**
+  - **Still open:** it's on the same disk as the database, so it covers mistakes, not a lost disk. Where an off-machine
+    copy goes is the user's call.
+- **UI, at the user's request:**
+  - **The brief moved to the header.** Brief, left of Export, shows it pinned under the header, where it stays while
+    the transcript scrolls. It used to be a card at the top of the transcript, which scrolled away. With no brief it
+    reads Add brief and opens the editor. A newly added brief opens there, so the chair sees where it lives.
+  - **A ⋯ menu on each meeting in the list,** with Delete meeting…. The first click only asks again inside the menu
+    ("Yes, delete it" / Cancel), with no dialog. A live meeting's round stops first. Deleting the open meeting goes
+    back to the start page.
+  - **Both side panels fold** into narrow rails on wide screens. The meetings rail keeps Show and New meeting. The
+    seats rail keeps Show, Add seat and each seat's avatar, ringed while it answers. The browser remembers both. On
+    phones, the same button closes the panel.
+  - **Checked** in a real browser against a throwaway database, at desktop and phone width: the brief panel with a
+    40-line brief, Add brief, folding and the reload that keeps it, Cancel, deleting another meeting, and deleting the
+    open one. 132 fast tests pass.
 - **Seats get 6 web calls per turn, up from 4.** In a real meeting on the cluster, all six answers used all 4, and in the second round no
   seat could open a news article.
 - **Links stop at Chinese punctuation,** in answers and in the rule on which URLs seats may read. A bare link ran on into the sentence after

@@ -7,13 +7,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useMeetings } from "@/components/shell/meetings-context";
 import { Button } from "@/components/ui/button";
 import { useLimits, useMeeting, useModels } from "@/hooks/use-meeting";
-import { BriefDialog } from "./brief";
+import { useStoredFlag } from "@/lib/stored-flag";
+import { BriefDialog, BriefPanel } from "./brief";
 import { Composer } from "./composer";
 import { EditSeatDialog } from "./edit-seat-dialog";
 import { MeetingHeader } from "./meeting-header";
 import { ReplyDialog } from "./reply-dialog";
 import { type Room, RoomContext } from "./room-context";
-import { SeatsPanel } from "./seats-panel";
+import { SeatsPanel, SeatsRail } from "./seats-panel";
 import { Transcript } from "./transcript";
 import { WrapUpDialog } from "./wrap-up-dialog";
 
@@ -28,12 +29,24 @@ export function MeetingRoom({ id }: { id: string }) {
   const [editSeat, setEditSeat] = useState<Seat | null>(null);
   const [briefDraft, setBriefDraft] = useState<string | null>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
+  // Wide screens can fold the seats into a narrow rail; this browser remembers it across meetings.
+  const [seatsFolded, setSeatsFolded] = useStoredFlag("homestorm.seats-folded");
+  const [briefShown, setBriefShown] = useState(false);
 
   const running = !!state?.rounds.some((r) => r.status === "running");
   const roundKey = state ? state.rounds.map((r) => `${r.id}:${r.status}`).join(",") : "";
   const seatKey = state ? state.seats.map((s) => s.id).join(",") : "";
   const limits = useLimits(id, `${roundKey}|${seatKey}`);
   const modelList = useModels();
+
+  // A brief that was just added opens under the header, so the chair sees where it lives now.
+  const hasBrief = !!state && !!briefAt(state.messages, state.meeting.clock);
+  const hadBrief = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!state) return;
+    if (hadBrief.current === false && hasBrief) setBriefShown(true);
+    hadBrief.current = hasBrief;
+  }, [state, hasBrief]);
 
   // Keep the sidebar's live / minutes badges in step with rounds starting and ending.
   // biome-ignore lint/correctness/useExhaustiveDependencies: roundKey is the trigger
@@ -116,7 +129,13 @@ export function MeetingRoom({ id }: { id: string }) {
   return (
     <RoomContext.Provider value={room}>
       <main className="flex min-w-0 flex-1 flex-col">
-        <MeetingHeader connection={connection} onToggleSeats={() => setSeatsOpen((o) => !o)} />
+        <MeetingHeader
+          connection={connection}
+          onToggleSeats={() => setSeatsOpen((o) => !o)}
+          briefShown={briefShown}
+          onToggleBrief={() => setBriefShown((o) => !o)}
+        />
+        {briefShown && <BriefPanel onClose={() => setBriefShown(false)} />}
         <div
           ref={scroller}
           className="flex-1 overflow-y-auto"
@@ -146,7 +165,11 @@ export function MeetingRoom({ id }: { id: string }) {
         <Composer key={id} />
       </main>
       <div className="hidden lg:flex">
-        <SeatsPanel />
+        {seatsFolded ? (
+          <SeatsRail onExpand={() => setSeatsFolded(false)} />
+        ) : (
+          <SeatsPanel onFold={() => setSeatsFolded(true)} />
+        )}
       </div>
       {seatsOpen && (
         <div className="fixed inset-0 z-40 flex justify-end lg:hidden">
@@ -156,7 +179,7 @@ export function MeetingRoom({ id }: { id: string }) {
             className="flex-1 bg-black/30"
             onClick={() => setSeatsOpen(false)}
           />
-          <SeatsPanel />
+          <SeatsPanel onFold={() => setSeatsOpen(false)} />
         </div>
       )}
       <ReplyDialog target={replyTarget} onClose={() => setReplyTarget(null)} />

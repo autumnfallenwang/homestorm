@@ -3,7 +3,7 @@
 What the first workable version of homestorm includes, the milestones to get there, and the decisions still open.
 Progress against this plan is logged in [progress.md](progress.md).
 
-**Updated:** 2026-11-05
+**Updated:** 2026-11-07
 
 ---
 
@@ -32,6 +32,8 @@ Progress against this plan is logged in [progress.md](progress.md).
 
 Slash commands, search, attachments and images, auto-discussion, private questions, polls, council mode, automatic
 titles, branching a meeting, memory across meetings.
+
+Done since v1: web search ([M9](#m9-tools-through-mcpgw-)) and images and text files (attachments phase 1).
 
 ---
 
@@ -154,6 +156,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 - [x] **Checked first:** streaming `tool_calls` through llmgw, on all three families with thinking on
 - [x] **Tests:** `FakeTools` next to `FakeLlm`, a fake MCP server over HTTP for the client, and a real meeting in a real
   browser
+- [x] **A real meeting on the cluster,** with the user signed in (2026-11-07): it led to 6 calls per turn and links that
+  stop at Chinese punctuation, and to mcpgw's search pacing and news fixes (mcpgw M10)
 
 ### Attachments ([ADR 0016](adr/0016-attachments-images-and-text-files.md))
 
@@ -170,3 +174,23 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
   turns before the wrap-up first
 - [x] Copy a posted wrap-up into the brief; the seat card turns amber at 80% and shows "Trimming older turns"; the
   message box suggests minutes
+
+### Upkeep and UI, 2026-11-07
+
+- [x] **Nightly backup:** a `pg_dump` CronJob in the chart at 03:30, the newest 14 kept in their own volume, which
+  Helm and Argo CD never delete. Same disk as the database, so it covers mistakes, not a lost disk. `scripts/backup.sh`
+  lists, takes, fetches and restores them
+- [ ] **Backup on the cluster:** deploy, take the first one with `scripts/backup.sh now`, and fetch it back
+- [ ] **By the user:** where an off-machine copy goes, if anywhere (`scripts/backup.sh fetch`)
+- [x] **The brief in the header:** Brief (or Add brief) left of Export, pinned under the header while shown
+- [x] **A ⋯ menu on each meeting in the list,** with Delete meeting… asked again inside the menu
+- [x] **Both side panels fold** into narrow rails; the browser remembers it
+- [ ] **By the user:** an `ARCH_INFRA_TOKEN` repo secret, so CI bumps image tags in arch-infra itself
+
+### Next, in order
+
+1. **Attachments phase 2:** PDF and DOCX as extracted text, read in a capped worker with a memory watch, as mcpgw does
+   for PDFs (its ADR 0011: a 0.2 MB PDF peaked at 626 MB there)
+2. **Tuning from real meetings,** with mcpgw's M10: drafts and release candidates in the web guidance, and whether
+   seats still use all 6 calls
+3. **One meeting feature from "Later":** a poll (each seat's position and confidence) is the smallest

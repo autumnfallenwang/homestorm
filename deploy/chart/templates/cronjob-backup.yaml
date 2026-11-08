@@ -1,0 +1,97 @@
+{{- if .Values.backup.enabled }}
+# The nightly database backup: pg_dump into its own volume (values.yaml, backup.*; the script is files/backup.sh).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "backup") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "backup") | nindent 4 }}
+data:
+  backup.sh: |
+    {{- .Files.Get "files/backup.sh" | nindent 4 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "backup") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "backup") | nindent 4 }}
+  annotations:
+    # The backups must outlive the chart: neither Helm nor an Argo CD prune or delete removes this volume.
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.backup.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.persistence.size }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "homestorm.fullname" (dict "context" . "component" "backup") }}
+  labels:
+    {{- include "homestorm.labels" (dict "context" . "component" "backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: {{ .Values.backup.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  # A night missed while the node was off still runs when it's back, within this window.
+  startingDeadlineSeconds: 21600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            {{- include "homestorm.selectorLabels" (dict "context" . "component" "backup") | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          # The Postgres image's user, like the database pod.
+          securityContext:
+            {{- toYaml .Values.db.podSecurityContext | nindent 12 }}
+          containers:
+            - name: pg-dump
+              # The database's own image, so pg_dump always matches the server's version.
+              image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+              imagePullPolicy: {{ .Values.db.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              command: ["/bin/sh", "/scripts/backup.sh"]
+              env:
+                - name: PGHOST
+                  value: {{ include "homestorm.fullname" (dict "context" . "component" "db") }}
+                - name: PGPORT
+                  value: {{ .Values.db.service.port | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.db.env.POSTGRES_DB | quote }}
+                - name: PGUSER
+                  value: {{ .Values.db.env.POSTGRES_USER | quote }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secrets.name }}
+                      key: POSTGRES_PASSWORD
+                - name: KEEP
+                  value: {{ .Values.backup.keep | quote }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ include "homestorm.fullname" (dict "context" . "component" "backup") }}
+            - name: scripts
+              configMap:
+                name: {{ include "homestorm.fullname" (dict "context" . "component" "backup") }}
+{{- end }}

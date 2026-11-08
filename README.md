@@ -56,6 +56,9 @@ Argo CD Application in `arch-infra` (`apps/homestorm.yaml`; review copy in `depl
   out-of-band: `HOMESTORM_SECRET_ENV=private/cluster-secrets.env bash scripts/create-cluster-secret.sh`. The file is
   gitignored; the template is `deploy/cluster-secrets.env.example`.
 - **First run:** open the web app and create the admin at once (ADR 0011).
+- **Backups:** a CronJob dumps the database every night at 03:30 (New York) into the `homestorm-backup` volume and
+  keeps the newest 14. It's the same disk as the database, so copy one elsewhere for a lost disk.
+  `scripts/backup.sh list | now | fetch <name> | restore <file>`; logs: `{namespace="homestorm"} | json | event=~"backup.*"`.
 - **Forgotten password:**
   `kubectl -n homestorm exec deploy/homestorm-api -- node --import tsx src/scripts/reset-password.ts <email>`.
 - **Logs:** `{namespace="homestorm"} | json`. One request and every seat turn it started:

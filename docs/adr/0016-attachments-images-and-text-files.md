@@ -59,7 +59,7 @@
 8. **The brief stays small:** at most 4 images and 24,000 characters of text files, since every seat gets it on
    every turn.
 9. **What the chair sees:**
-   - **Thumbnails:** about 80 px in the chat, about 48 px in the brief card and the editors. Text files show as chips
+   - **Thumbnails:** about 80 px in the chat, about 48 px in the brief panel and the editors. Text files show as chips
      with their name and size.
    - **The full-size viewer:**
      - **click any file:** images open fitted to the window and are never stretched; text files open as their text;
@@ -95,8 +95,8 @@
 
 ## Consequences
 
-- **Database size:** images go in the meeting database, about 0.3–1 MB each after resizing. That database has **no
-  backup yet**.
+- **Database size:** images go in the meeting database, about 0.3–1 MB each after resizing. It's backed up nightly
+  since 2026-11-07 (a `pg_dump` CronJob in the chart, newest 14 kept, on the same disk; `scripts/backup.sh`).
 - **Cost:** every image is re-sent to every seat on every turn. The context meter counts it.
 - **Text-only seats are slower:** llmgw re-describes the images on every turn (the first V4 Pro turn took 23 s),
   and the quality depends on the describing model.

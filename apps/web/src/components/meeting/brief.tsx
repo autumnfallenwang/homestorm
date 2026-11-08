@@ -1,7 +1,7 @@
 "use client";
 
 import { ATTACHMENT_LIMITS, BRIEF_MAX_CHARS, briefAt, type Message } from "@homestorm/shared";
-import { FileText, Loader2, Pencil } from "lucide-react";
+import { FilePlus, FileText, Loader2, Pencil, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,56 +34,94 @@ export function useCurrentBriefMessage(): Message | undefined {
     .at(-1);
 }
 
-/** Pinned at the top of the meeting: the standing context every seat always sees. */
-export function BriefCard() {
-  const { id, openBrief } = useRoom();
+/**
+ * The header's Brief button. With a brief, it shows or hides the brief under the header; without one, it opens the
+ * editor.
+ */
+export function BriefButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  const { openBrief } = useRoom();
   const brief = useCurrentBrief();
   const files = useCurrentBriefMessage()?.attachments ?? [];
-  const [open, setOpen] = useState(false);
   if (!brief && !files.length) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-muted-foreground"
+        aria-label="Add a meeting brief"
+        title="Add a meeting brief: background, facts, images or files every seat always sees, never trimmed"
         onClick={() => openBrief()}
-        className="flex w-full items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent"
       >
-        <FileText className="size-3.5 shrink-0" />
-        Add a meeting brief: background, facts, images or files every seat always sees, never
-        trimmed.
-      </button>
+        <FilePlus />
+        <span className="hidden sm:inline">Add brief</span>
+      </Button>
     );
   }
   return (
-    <section aria-label="Meeting brief" className="rounded-lg border bg-muted/40 px-3 py-2.5">
-      <header className="flex items-center gap-2">
-        <FileText className="size-3.5 text-muted-foreground" />
-        <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Meeting brief
-        </h2>
-        <span className="text-xs text-muted-foreground">· every seat always sees this</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto h-6 gap-1 px-2 text-xs"
-          onClick={() => openBrief()}
-        >
-          <Pencil className="size-3" />
-          Edit
-        </Button>
-      </header>
-      {brief && (
-        <p className={cn("mt-1.5 text-sm whitespace-pre-wrap", !open && "line-clamp-4")}>{brief}</p>
-      )}
-      {brief.split("\n").length > 4 || brief.length > 320 ? (
-        <button
-          type="button"
-          className="mt-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-          onClick={() => setOpen((o) => !o)}
-        >
-          {open ? "Show less" : "Show all"}
-        </button>
-      ) : null}
-      <AttachmentStrip files={shownSaved(id, files)} size="sm" className="mt-2" />
+    <Button
+      variant={shown ? "secondary" : "outline"}
+      size="sm"
+      className="h-8"
+      aria-label="Meeting brief"
+      aria-expanded={shown}
+      aria-controls="meeting-brief"
+      title={shown ? "Hide the meeting brief" : "Show the meeting brief"}
+      onClick={onToggle}
+    >
+      <FileText />
+      <span className="hidden sm:inline">Brief</span>
+    </Button>
+  );
+}
+
+/**
+ * The standing context every seat always sees, pinned under the header while it's shown, so it never scrolls away
+ * with the transcript.
+ */
+export function BriefPanel({ onClose }: { onClose: () => void }) {
+  const { id, openBrief } = useRoom();
+  const brief = useCurrentBrief();
+  const files = useCurrentBriefMessage()?.attachments ?? [];
+  if (!brief && !files.length) return null;
+  return (
+    <section id="meeting-brief" aria-label="Meeting brief" className="border-b bg-muted/40">
+      <div className="mx-auto max-w-3xl px-4 py-2.5">
+        <header className="flex items-center gap-2">
+          <FileText className="size-3.5 text-muted-foreground" />
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Meeting brief
+          </h2>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            · every seat always sees this
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto h-6 gap-1 px-2 text-xs"
+            onClick={() => openBrief()}
+          >
+            <Pencil className="size-3" />
+            Edit
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            aria-label="Hide the meeting brief"
+            onClick={onClose}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </header>
+        <div className="mt-1.5 max-h-[40vh] overflow-y-auto">
+          {brief && <p className="text-sm whitespace-pre-wrap">{brief}</p>}
+          <AttachmentStrip
+            files={shownSaved(id, files)}
+            size="sm"
+            className={brief ? "mt-2" : undefined}
+          />
+        </div>
+      </div>
     </section>
   );
 }

@@ -7,6 +7,8 @@ import {
   Check,
   Hand,
   MoreHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
   Pencil,
   Trash2,
   Volume2,
@@ -37,17 +39,30 @@ import { BUDGET_LABEL } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
 
-/** Right pane, always visible on wide screens (ADR 0007): seat cards, then the room rules. */
-export function SeatsPanel() {
+/**
+ * Right pane on wide screens (ADR 0007): seat cards, then the room rules. `onFold` hides it: into the rail on wide
+ * screens, or closing the overlay on narrow ones.
+ */
+export function SeatsPanel({ onFold }: { onFold: () => void }) {
   const { state } = useRoom();
   const seats = state.seats.filter((s) => !s.removedAt);
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-l bg-sidebar" aria-label="Seats">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h2 className="text-sm font-semibold">
+      <div className="flex items-center gap-2 pt-4 pr-2 pb-2 pl-4">
+        <h2 className="flex-1 text-sm font-semibold">
           Seats <span className="font-normal text-muted-foreground">· {seats.length}</span>
         </h2>
         <AddSeatDialog />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label="Hide seats"
+          title="Hide seats"
+          onClick={onFold}
+        >
+          <PanelRightClose />
+        </Button>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
         {seats.length === 0 && (
@@ -60,6 +75,50 @@ export function SeatsPanel() {
         ))}
       </div>
       <RoomRules />
+    </aside>
+  );
+}
+
+/** The folded seats panel on wide screens: open it again, and each seat's avatar with its status. */
+export function SeatsRail({ onExpand }: { onExpand: () => void }) {
+  const { state, limits } = useRoom();
+  const seats = state.seats.filter((s) => !s.removedAt);
+  return (
+    <aside
+      className="flex h-full w-12 shrink-0 flex-col items-center gap-2 border-l bg-sidebar pt-4"
+      aria-label="Seats, folded"
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 text-muted-foreground"
+        aria-label="Show seats"
+        title="Show seats"
+        onClick={onExpand}
+      >
+        <PanelRightOpen />
+      </Button>
+      <AddSeatDialog compact />
+      <ul className="flex flex-col items-center gap-2 overflow-y-auto pt-1 pb-3">
+        {seats.map((s) => {
+          const status = seatStatus(s, state, limits[s.id]);
+          return (
+            <li key={s.id} title={`${s.displayName} · ${status}`}>
+              <span
+                className={cn(
+                  "block rounded-full",
+                  status === "Answering" && "ring-2 ring-brand/60 ring-offset-1",
+                )}
+              >
+                <SeatAvatar name={s.displayName} source={s.ownedBy} size="sm" dashed={s.muted} />
+              </span>
+              <span className="sr-only">
+                {s.displayName}: {status}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </aside>
   );
 }

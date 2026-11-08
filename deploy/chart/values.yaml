@@ -141,6 +141,25 @@ db:
     runAsGroup: 999
     fsGroup: 999
 
+# Nightly backup: pg_dump of the whole database, attachments included, into its own volume, keeping the newest
+# `keep`. The volume sits on the same disk as the database, so this protects against mistakes (a deleted meeting, a
+# bad migration), not against losing the disk: copy a dump elsewhere with `scripts/backup.sh fetch`. Restore with
+# `scripts/backup.sh restore`.
+backup:
+  enabled: true
+  schedule: "30 3 * * *"
+  timeZone: America/New_York
+  keep: 14
+  persistence:
+    size: 5Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
 # Migrate Job: OFF. The API applies apps/api/drizzle/*.sql itself at boot, waiting
 # for Postgres if it's still starting (apps/api/src/db/migrate.ts). The sibling
 # apps' Helm pre-install hook can't work on a first install: it runs before the

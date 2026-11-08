@@ -23,14 +23,19 @@ import { Input } from "@/components/ui/input";
 import type { Connection } from "@/hooks/use-meeting";
 import { api } from "@/lib/api";
 import { compactNumber, meetingStatus, meetingTotals } from "@/lib/format";
+import { BriefButton } from "./brief";
 import { useRoom } from "./room-context";
 
 export function MeetingHeader({
   connection,
   onToggleSeats,
+  briefShown,
+  onToggleBrief,
 }: {
   connection: Connection;
   onToggleSeats: () => void;
+  briefShown: boolean;
+  onToggleBrief: () => void;
 }) {
   const { id, state, running, act, openWrapUp } = useRoom();
   const { refresh } = useMeetings();
@@ -121,6 +126,7 @@ export function MeetingHeader({
           )}
         </p>
       </div>
+      <BriefButton shown={briefShown} onToggle={onToggleBrief} />
       <Button asChild variant="outline" size="sm" className="h-8">
         <a href={api.exportUrl(id)} download>
           <Download />

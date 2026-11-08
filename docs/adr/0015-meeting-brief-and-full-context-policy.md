@@ -42,7 +42,8 @@
   the discussion started puts one line where it entered the record: "(The Chair updated the meeting brief. Your
   instructions have the current version.)", or "cleared" when it's emptied. Seats can then square earlier answers
   with the new facts.
-- **The chair sees it** pinned at the top of the meeting, with Edit. Each change shows in the transcript ("You
+- **The chair sees it** from **Brief** in the meeting's header, pinned under the header with Edit (a card at the
+  top of the transcript until 2026-11-07, which scrolled away). Each change shows in the transcript ("You
   updated the meeting brief"), and the export puts the current brief at the top.
 
 ### 2. When a view is over its budget: keep the start, the summary and the newest

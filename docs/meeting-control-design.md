@@ -159,7 +159,7 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
   - **Message box:** the send-to selector (**Everyone · blind ▾**, with a hint like "3 active seats will answer · type @ to
     pick seats instead"), a text area, a status line, Stop all and Send. Under it: "Seats speak only when you give them
     the floor."
-- **Right: seats panel** (always visible).
+- **Right: seats panel** (folds into a rail of avatars on wide screens, since 2026-11-07).
   - A seat card per seat: avatar, name, model ID, status, allowance line + bar from `/v1/limits` (e.g. "NN% left this week ·
     resets <date>", "NN% left this month · resets <date>", "$X.XX left"), and Ask / Mute / ⋯.
   - Muted seats get a dashed card: "Skipped in rounds. Still hears everything."
@@ -206,7 +206,7 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
   primary buttons.
 - **Source colors:** each source has its own avatar color (Claude orange, GPT teal, DeepSeek blue). They're always
   paired with a text label.
-- **Layout:** chair on the right, seats on the left, like most chat apps; the seats panel is always visible.
+- **Layout:** chair on the right, seats on the left, like most chat apps; both side panels can fold into a narrow rail.
 - **Accessibility:** real buttons and inputs with labels, `aria-label` on icon-only buttons, and contrast at 4.5:1
   or better.
 

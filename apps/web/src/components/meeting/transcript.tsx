@@ -19,7 +19,7 @@ import { api } from "@/lib/api";
 import { clockTime, compactNumber, plainText, roundProgress, sentToLine } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AttachmentStrip, shownSaved } from "./attachments";
-import { BriefCard, useCurrentBrief } from "./brief";
+import { useCurrentBrief } from "./brief";
 import { Markdown } from "./markdown";
 import { useRoom } from "./room-context";
 import { SeatAvatar, SourceTag } from "./source";
@@ -62,12 +62,14 @@ export function Transcript() {
   if (!items.some((it) => it.kind === "round" || it.message.authorKind !== "brief")) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <BriefCard />
         <div className="mx-auto max-w-md py-16 text-center text-sm text-muted-foreground">
           <p className="font-medium text-foreground">The floor is yours.</p>
           <p className="mt-1">
             Add seats on the right, then ask your question. By default everyone answers blind: each
             seat answers without seeing the others.
+          </p>
+          <p className="mt-2">
+            Background every seat should always have goes in the meeting brief, at the top.
           </p>
         </div>
       </div>
@@ -75,8 +77,7 @@ export function Transcript() {
   }
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <BriefCard />
-      <ol className="mt-4 flex flex-col gap-4" aria-label="Transcript">
+      <ol className="flex flex-col gap-4" aria-label="Transcript">
         {items.map((it) =>
           it.kind === "round" ? (
             <li key={it.round.id}>
