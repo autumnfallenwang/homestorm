@@ -552,6 +552,19 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       });
     const enable = (seat: Seat, webAccess: "on" | "must" = "on") =>
       store.updateSeat(seat.id, { webAccess });
+    const roomRule = (w: World, webAccess: "off" | "on" | "must") =>
+      store.updateMeeting(w.meeting.id, { webAccess });
+    // The chair's search was removed on 2026-11-08 (ADR 0017). Meetings from before still hold its messages, which
+    // looked like this.
+    const oldChairSearch = async (w: World) =>
+      store.insertMessage({
+        meetingId: w.meeting.id,
+        authorKind: "sources",
+        content: 'Results for "gold":\n\n1. [Gold today](https://news.example/gold)',
+        status: "done",
+        visibleSeq: await store.bumpClock(w.meeting.id),
+        toolCalls: [{ tool: "web_search", input: "gold", status: "ok", urls: SEARCH_URLS }],
+      });
     const lastMessage = async (w: World) => (await seatMessages(w.meeting.id)).at(-1)!;
 
     it("offers no tools to a seat that isn't allowed them", async () => {
@@ -686,10 +699,10 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         expect(w.tools.calls).toHaveLength(1);
       });
 
-      it("allows a link from the chair's posted search", async () => {
+      it("allows a link from an old chair search", async () => {
         const w = await world();
         await enable(w.gpt);
-        await w.engine.search(w.meeting.id, "gold");
+        await oldChairSearch(w);
         fetchOnly(w, w.gpt, SEARCH_URLS[1] as string);
         await ask(w, w.gpt);
         await w.engine.waitIdle(w.meeting.id);
@@ -947,17 +960,61 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       });
     });
 
-    describe("the chair's search", () => {
-      it("posts one message every seat reads, with no model involved", async () => {
+    describe("the room rule (ADR 0017)", () => {
+      it("starts off, and a seat with no setting of its own follows it", async () => {
         const w = await world();
-        const message = await w.engine.search(w.meeting.id, "gold price");
-        expect(w.llm.calls).toEqual([]);
-        expect(message).toMatchObject({ authorKind: "sources", status: "done" });
-        expect(message.visibleSeq).not.toBeNull();
-        expect(message.content).toContain('Results for "gold price"');
-        expect(message.content).toContain("[Gold today](https://news.example/gold)");
-        expect(message.toolCalls[0]?.urls).toEqual(SEARCH_URLS);
+        expect(w.meeting.webAccess).toBe("off");
+        expect(w.gpt.webAccess).toBeNull();
+        await roomRule(w, "on");
+        await ask(w, w.gpt);
+        await w.engine.waitIdle(w.meeting.id);
+        expect(w.llm.callsFor(w.gpt.model)[0]?.tools?.map((t) => t.function.name)).toEqual([
+          "web_search",
+          "web_fetch",
+        ]);
 
+        await roomRule(w, "off");
+        await ask(w, w.gpt);
+        await w.engine.waitIdle(w.meeting.id);
+        expect(w.llm.callsFor(w.gpt.model)[1]?.tools).toBeUndefined();
+      });
+
+      it("a seat's own setting wins over it, either way", async () => {
+        const w = await world();
+        await roomRule(w, "on");
+        await store.updateSeat(w.gpt.id, { webAccess: "off" });
+        await ask(w, w.gpt);
+        await w.engine.waitIdle(w.meeting.id);
+        expect(w.llm.callsFor(w.gpt.model)[0]?.tools).toBeUndefined();
+
+        await roomRule(w, "off");
+        await enable(w.ds);
+        await ask(w, w.ds);
+        await w.engine.waitIdle(w.meeting.id);
+        expect(w.llm.callsFor(w.ds.model)[0]?.tools).toBeDefined();
+      });
+
+      it("Must search first, as the room rule, makes a following seat search", async () => {
+        const w = await world();
+        await roomRule(w, "must");
+        w.llm.on(
+          w.claude.model,
+          { chunks: [], toolCalls: [toolCall("web_search", { query: "q" })] },
+          { chunks: ["Answer."] },
+        );
+        await ask(w, w.claude);
+        await w.engine.waitIdle(w.meeting.id);
+        expect(w.llm.callsFor(w.claude.model)[0]?.toolChoice).toEqual({
+          type: "function",
+          function: { name: "web_search" },
+        });
+      });
+    });
+
+    describe("an old chair search", () => {
+      it("every seat still reads it", async () => {
+        const w = await world();
+        await oldChairSearch(w);
         await w.engine.send(w.meeting.id, {
           text: "What do you make of that?",
           mode: "blind",
@@ -972,45 +1029,9 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         }
       });
 
-      it("can run during a round, and seats already answering don't see it", async () => {
-        const w = await world();
-        w.llm.on(w.gpt.model, { chunks: ["Thinking"], hangAfterChunks: true });
-        await ask(w, w.gpt);
-        await until(async () => (await lastMessage(w))?.status === "streaming");
-        await w.engine.search(w.meeting.id, "gold");
-        await w.engine.stop(w.meeting.id);
-        await w.engine.waitIdle(w.meeting.id);
-        expect(userText(w.llm.callsFor(w.gpt.model)[0] as ChatTurn)).not.toContain(
-          "Web search results",
-        );
-      });
-
-      it("says so when nothing was found, and posts nothing", async () => {
-        const w = await world();
-        w.tools.searchResult = {
-          text: 'No results for "zzz". Try different words.',
-          isError: false,
-          meta: { results: [] },
-        };
-        await expect(w.engine.search(w.meeting.id, "zzz")).rejects.toMatchObject({
-          status: 400,
-          message: expect.stringContaining("No results"),
-        });
-        const state = await store.getState(w.meeting.id);
-        expect(state?.messages).toEqual([]);
-      });
-
-      it("reports mcpgw being unreachable, or not set up", async () => {
-        const w = await world();
-        w.tools.callThrows = true;
-        await expect(w.engine.search(w.meeting.id, "q")).rejects.toMatchObject({ status: 502 });
-        const none = new Engine({ store, llm: w.llm, hub: w.hub, viewTokenBudget: 120_000 });
-        await expect(none.search(w.meeting.id, "q")).rejects.toMatchObject({ status: 503 });
-      });
-
       it("can't be replied to", async () => {
         const w = await world();
-        const message = await w.engine.search(w.meeting.id, "gold");
+        const message = await oldChairSearch(w);
         await expect(
           w.engine.send(w.meeting.id, {
             text: "",

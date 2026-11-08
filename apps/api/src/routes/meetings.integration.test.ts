@@ -411,6 +411,52 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     ]);
   });
 
+  it("has a web tools room rule that seats follow unless they have their own (ADR 0017)", async () => {
+    const { call } = setup();
+    const created = (await call("POST", "/api/meetings", { title: "Web" })).body;
+    const id = created.id as string;
+    expect(created.webAccess).toBe("off");
+    const follows = (await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" }))
+      .body as Seat;
+    const own = (
+      await call("POST", `/api/meetings/${id}/seats`, {
+        model: "deepseek-v4-pro",
+        displayName: "Checker",
+        webAccess: "must",
+      })
+    ).body as Seat;
+    expect(follows.webAccess).toBeNull();
+    expect(own.webAccess).toBe("must");
+
+    await call("PATCH", `/api/meetings/${id}`, { webAccess: "on" });
+    await call("PATCH", `/api/meetings/${id}`, { webAccess: "on" });
+    expect((await call("PATCH", `/api/meetings/${id}`, { webAccess: "always" })).status).toBe(400);
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("| GPT-6 Luna | `gpt-6-luna` | GPT · ChatGPT | web tools: on |");
+    expect(md).toContain("web tools: must");
+
+    await call("PATCH", `/api/meetings/${id}/seats/${follows.id}`, { webAccess: "off" });
+    const reset = await call("PATCH", `/api/meetings/${id}/seats/${own.id}`, { webAccess: null });
+    expect(reset.body.webAccess).toBeNull();
+
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.meeting.webAccess).toBe("on");
+    expect(state.messages.filter((m) => m.authorKind === "event").map((m) => m.content)).toEqual([
+      "You added GPT-6 Luna",
+      "You added Checker",
+      "You set web tools to Can search",
+      "You set GPT-6 Luna's web tools to Off",
+      "You set Checker's web tools back to the room rule",
+    ]);
+  });
+
+  it("no longer has the chair's web search (ADR 0017)", async () => {
+    const { call } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "No search" })).body.id as string;
+    expect((await call("POST", `/api/meetings/${id}/search`, { query: "gold" })).status).toBe(404);
+  });
+
   it("lets a seat pick a context budget, records changes, and lists the Standard size", async () => {
     const { call } = setup();
     expect((await call("GET", "/api/models")).body.standardContextBudget).toBe(120_000);

@@ -1,7 +1,8 @@
 # 0014: Tools through mcpgw; homestorm runs the loop
 
-- **Status:** accepted, built 2026-11-05.
-- **Date:** 2026-11-04, updated 2026-11-05
+- **Status:** accepted, built 2026-11-05. Point 2, the chair's search, was replaced on 2026-11-08 by a web tools room
+  rule ([ADR 0017](0017-web-tools-room-rule.md)).
+- **Date:** 2026-11-04, updated 2026-11-08
 
 ## Context
 
@@ -30,8 +31,10 @@ homestorm calls it with `@modelcontextprotocol/client`, and converts tools to Op
    date can tell when their knowledge may be stale.
 2. **Chair search first.** A "Search the web" action: homestorm calls mcpgw's `web_search` and posts the results
    into the record as one "Sources" message. No model decides anything, and every seat reads the same sources, so
-   blind rounds stay fair.
-3. **Seat tools.** A seat setting: off, "Can search and read pages", or "Must search before answering". homestorm passes
+   blind rounds stay fair. *Removed on 2026-11-08 (ADR 0017): the chair didn't need it, and web tools became a room
+   rule instead. Old Sources messages stay.*
+3. **Seat tools.** A seat setting: off, "Can search and read pages", or "Must search before answering". Since
+   2026-11-08 it's a room rule that each seat follows unless it has its own (ADR 0017). homestorm passes
    mcpgw's tools to llmgw for that seat only, runs each tool call on mcpgw, and returns the result, up to 6 calls per
    turn (first 4; raised on 2026-11-07 after every answer in a real meeting used all 4 and none could open a news article). Under the answer: "Searched: … · Read: …"; the sources enter the record.
 
@@ -71,7 +74,8 @@ meeting, so it enforces this (mcpgw's ADR 0007):
 - homestorm depends on two gateways: llmgw for models, mcpgw for tools. Without mcpgw, the tool features are off
   and everything else works as now.
 - Seat tools make turns slower and use more allowance; the per-turn call limit bounds both.
-- In a blind round, seats that search may read different sources. Chair search avoids that.
+- In a blind round, seats that search may read different sources. Chair search avoided that, until it was removed
+  (ADR 0017).
 - Some models repeat a weak source as fact, so the sources must always be visible to the chair.
 - **Tested on all three families,** with thinking on: streaming `tool_calls`, several steps, naming a tool, and the forced
   final answer.

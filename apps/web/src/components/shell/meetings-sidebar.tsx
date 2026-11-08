@@ -2,10 +2,7 @@
 
 import type { MeetingSummary } from "@homestorm/shared";
 import {
-  ChevronsUpDown,
-  KeyRound,
   Loader2,
-  LogOut,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -16,22 +13,19 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { useMe } from "@/components/auth/session-gate";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { signOut } from "@/lib/auth-client";
-import { dayGroup, initials } from "@/lib/format";
+import { dayGroup } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ChangePasswordDialog } from "./change-password-dialog";
+import { AccountMenu } from "./account-menu";
 import { Logo } from "./logo";
 import { useMeetings } from "./meetings-context";
 import { NewMeetingDialog } from "./new-meeting-dialog";
@@ -50,11 +44,8 @@ export function MeetingsSidebar({
   onFold: () => void;
 }) {
   const { meetings } = useMeetings();
-  const me = useMe();
-  const router = useRouter();
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState("");
-  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -147,45 +138,7 @@ export function MeetingsSidebar({
         ))}
       </nav>
       <div className="border-t p-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent"
-            >
-              <span className="flex size-7 items-center justify-center rounded-full bg-brand text-xs font-semibold text-brand-foreground">
-                {initials(me.user.name || "Chair")}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{me.user.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  Chair · {me.user.email}
-                </span>
-              </span>
-              <ChevronsUpDown className="size-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              Signed in as {me.user.email}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
-              <KeyRound />
-              Change password
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={async () => {
-                await signOut().catch(() => {});
-                router.replace("/sign-in");
-              }}
-            >
-              <LogOut />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+        <AccountMenu />
       </div>
     </aside>
   );
@@ -214,6 +167,9 @@ export function MeetingsRail({ onExpand }: { onExpand: () => void }) {
           <Plus />
         </Button>
       </NewMeetingDialog>
+      <div className="mt-auto pb-2">
+        <AccountMenu compact />
+      </div>
     </aside>
   );
 }

@@ -133,7 +133,7 @@ The etiquette rules are the only rules that live in natural language. If a bot b
 A modern three-pane chat app in the shadcn style used by the other home apps:
 
 - **Left: meetings list.** App name, New meeting, search, meetings grouped by day (live / minutes written), the chair's
-  profile.
+  profile, whose menu opens Settings (Profile, Appearance; ADR 0018) or signs out.
 - **Middle: the meeting.**
   - **Header:** title, status ("Round 2 in progress"), token count and DeepSeek spend, Export, Wrap up ▾.
   - **Attachments** (added 2026-11-04, [ADR 0016](adr/0016-attachments-images-and-text-files.md)): the message box
@@ -164,8 +164,9 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
     resets <date>", "NN% left this month · resets <date>", "$X.XX left"), and Ask / Mute / ⋯.
   - Muted seats get a dashed card: "Skipped in rounds. Still hears everything."
   - Add seat at the top.
-  - A **Room rules** box: answer length (Concise), plus two that are always on: seats speak only when called, and
-    seats may disagree with the chair. Blind or in turn is picked per message in the message box, which starts on
+  - A **Room rules** box: answer length (Concise) and web tools (Off; shown when mcpgw is reachable), plus two that are
+    always on: seats speak only when called, and seats may disagree with the chair. A seat follows each room rule
+    unless it has its own setting (ADR 0012, ADR 0017). Blind or in turn is picked per message in the message box, which starts on
     Everyone · blind; the room rule for "new questions go to" was removed on 2026-11-03 because it duplicated it.
 
 ### Controls and states (see the mockup's board 2)
@@ -226,7 +227,7 @@ A modern three-pane chat app in the shadcn style used by the other home apps:
 
 ## 7. Next: the data model
 
-- **meeting:** title, room rule (answer length), status.
+- **meeting:** title, room rules (answer length, web tools), status.
 - **seat:** model ID, `owned_by`, display name, persona, order, muted.
 - **message:** author (chair or a seat), content, round, reply-to, status (streaming / done / stopped / error),
   usage, cost, llmgw `req_id`, start and finish times (the visibility rule depends on them).

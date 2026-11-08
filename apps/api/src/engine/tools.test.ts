@@ -6,7 +6,6 @@ import {
   readToolCall,
   researchNote,
   searchUrls,
-  sourcesContent,
   urlsIn,
 } from "./tools.js";
 
@@ -128,13 +127,6 @@ describe("what goes into the record", () => {
     expect(searchUrls(meta)).toEqual(["https://a.example/", "https://b.example/"]);
     expect(searchUrls(null)).toEqual([]);
     expect(searchUrls({ results: "nope" })).toEqual([]);
-  });
-
-  it("writes the chair's search as a linked list", () => {
-    const text = sourcesContent("q", { results: meta.results.slice(0, 2) });
-    expect(text).toContain('Results for "q":');
-    expect(text).toContain("1. [A](https://a.example/) (2026-01-02): About A");
-    expect(text).toContain("2. [https://b.example/](https://b.example/)");
   });
 
   it("marks research as data, and caps each call's share", () => {

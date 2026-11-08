@@ -7,6 +7,7 @@ import {
   type Message,
   type Round,
   type Seat,
+  seatWebAccess,
   sourceLabel,
   toolSummary,
 } from "@homestorm/shared";
@@ -60,7 +61,7 @@ export function exportMarkdown(
         s.muted ? "muted" : "",
         s.answerLength ? `answers: ${s.answerLength}` : "",
         s.contextBudget && s.contextBudget !== "standard" ? `context: ${s.contextBudget}` : "",
-        s.webAccess !== "off" ? `web tools: ${s.webAccess}` : "",
+        seatWebAccess(s, meeting) !== "off" ? `web tools: ${seatWebAccess(s, meeting)}` : "",
         s.persona ? `persona: ${oneLine(s.persona)}` : "",
       ]
         .filter(Boolean)

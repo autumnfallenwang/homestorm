@@ -102,9 +102,6 @@ export const api = {
       `/api/meetings/${id}/actions`,
       action,
     ),
-  /** The chair's "Search the web": the results are posted as one message every seat reads. */
-  search: (id: string, query: string) =>
-    request<Message>("POST", `/api/meetings/${id}/search`, { query }),
   wrapUp: (id: string, input: WrapUpInput) =>
     request<Round>("POST", `/api/meetings/${id}/wrap-up`, input),
   stop: (id: string, messageId?: string) =>

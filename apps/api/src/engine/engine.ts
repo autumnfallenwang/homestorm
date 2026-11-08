@@ -22,8 +22,10 @@ import {
   type Seat,
   type SendAction,
   seatAnswerLength,
+  seatWebAccess,
   stripSpeakerTag,
   type ToolActivity,
+  type WebAccess,
   type WrapKind,
 } from "@homestorm/shared";
 import { log } from "../lib/logger.js";
@@ -54,7 +56,6 @@ import {
   readToolCall,
   researchNote,
   searchUrls,
-  sourcesContent,
   URL_REFUSED,
 } from "./tools.js";
 import { buildView, textOf, type ViewAttachment } from "./view.js";
@@ -232,49 +233,6 @@ export class Engine {
       hidden: false,
     });
     return { message, round };
-  }
-
-  /**
-   * The chair's "Search the web" (ADR 0014): no model decides anything. The results enter the record as one message
-   * every seat reads, which keeps blind rounds fair. Like a comment, it can be posted while a round runs: seats already
-   * answering keep their cutoff and don't see it.
-   */
-  async search(meetingId: string, query: string): Promise<Message> {
-    await this.requireMeeting(meetingId);
-    if (!this.tools) throw new EngineError(503, "Web search isn't set up on this server.");
-    const requestId = `homestorm-${randomUUID()}`;
-    let found: Awaited<ReturnType<ToolClient["call"]>>;
-    try {
-      found = await this.tools.call("web_search", { query }, { requestId });
-    } catch (err) {
-      log.warn({ event: "chair.search_failed", request_id: requestId, err }, "chair search failed");
-      throw new EngineError(502, "Couldn't reach the web search service. Try again in a moment.");
-    }
-    if (found.isError) throw new EngineError(502, found.text);
-    const urls = searchUrls(found.meta);
-    if (!urls.length) throw new EngineError(400, found.text);
-
-    const visibleSeq = await this.store.bumpClock(meetingId);
-    const now = new Date();
-    const message = await this.store.insertMessage({
-      meetingId,
-      authorKind: "sources",
-      content: sourcesContent(query, found.meta),
-      status: "done",
-      visibleSeq,
-      toolCalls: [{ tool: "web_search", input: query, status: "ok", urls }],
-      requestId,
-      startedAt: now,
-      finishedAt: now,
-    });
-    await this.store.touchMeeting(meetingId);
-    this.emit(meetingId, { type: "message", message });
-    await this.emitMeeting(meetingId);
-    log.info(
-      { event: "chair.search", meeting_id: meetingId, request_id: requestId, results: urls.length },
-      "chair search posted",
-    );
-    return message;
   }
 
   /** Wrap up: one seat writes the minutes, a decision, or the open questions. */
@@ -715,8 +673,12 @@ export class Engine {
 
   /** What the seat is told it's doing now, derived from its round (so a retry gets the same note). */
   /** The tools to offer this seat this turn, or null. mcpgw being down isn't a reason to fail the turn. */
-  private async toolsFor(seat: Seat, floor: Floor): Promise<ToolDefinition[] | null> {
-    if (!this.tools || seat.webAccess === "off" || floor.kind === "wrap_up") return null;
+  private async toolsFor(
+    seat: Seat,
+    web: WebAccess,
+    floor: Floor,
+  ): Promise<ToolDefinition[] | null> {
+    if (!this.tools || web === "off" || floor.kind === "wrap_up") return null;
     try {
       return await this.tools.list();
     } catch (err) {
@@ -853,7 +815,9 @@ export class Engine {
       seat.reasoningEffort,
       info?.maxTokens ?? null,
     );
-    const tools = await this.toolsFor(seat, floor);
+    // The seat's own web setting, or the room rule (ADR 0017), as of when the turn starts.
+    const web = seatWebAccess(seat, state.meeting);
+    const tools = await this.toolsFor(seat, web, floor);
     const view = buildView({
       webTools: !!tools,
       meeting: state.meeting,
@@ -957,8 +921,7 @@ export class Engine {
           ...(offer
             ? {
                 tools: tools ?? [],
-                toolChoice:
-                  step === 0 && seat.webAccess === "must" ? FORCED_SEARCH : ("auto" as const),
+                toolChoice: step === 0 && web === "must" ? FORCED_SEARCH : ("auto" as const),
               }
             : {}),
         })) {

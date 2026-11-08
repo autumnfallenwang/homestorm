@@ -1,6 +1,7 @@
 // Sign-in, first-run sign-up and the session (ADR 0011), against Better Auth's routes on the API.
 // Plain HTTP on the LAN, accepted as in the sibling apps: the password never appears in a URL or a log line.
 
+import type { UpdateMeInput } from "@homestorm/shared";
 import { ApiError, apiBaseUrl } from "./api";
 
 export interface Me {
@@ -51,6 +52,11 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
     method: "POST",
     body: { currentPassword, newPassword, revokeOtherSessions: true },
   });
+}
+
+/** Settings → Profile: change the admin's name or sign-in email (ADR 0018). */
+export function updateMe(patch: UpdateMeInput): Promise<Me> {
+  return call("/api/me", { method: "PATCH", body: patch });
 }
 
 /** Who is signed in, or null. */

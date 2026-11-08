@@ -103,4 +103,40 @@ describe.skipIf(!hasTestDb)("login (integration)", () => {
     expect((await signIn("correct horse battery")).status).toBe(401);
     expect((await signIn("staple battery horse")).status).toBe(200);
   });
+
+  it("changes the admin's name and sign-in email from Settings → Profile (ADR 0018)", async () => {
+    const app = createApp({ rateLimit: false });
+    const b = browser(app);
+    await b("/api/auth/sign-up/email", {
+      method: "POST",
+      body: { name: "Chair", email: "chair@example.com", password: "correct horse battery" },
+    });
+
+    const patch = (body: unknown) => b("/api/me", { method: "PATCH", body });
+    expect((await patch({})).status).toBe(400);
+    expect((await patch({ name: "  " })).status).toBe(400);
+    expect((await patch({ email: "not an email" })).status).toBe(400);
+
+    const changed = await patch({ name: " Aaron ", email: " Aaron@Example.com " });
+    expect(changed.status).toBe(200);
+    expect(((await changed.json()) as { user: unknown }).user).toMatchObject({
+      name: "Aaron",
+      email: "aaron@example.com",
+    });
+    // This session carries on, and sees the change.
+    const me = (await (await b("/api/me")).json()) as { user: { name: string; email: string } };
+    expect(me.user).toMatchObject({ name: "Aaron", email: "aaron@example.com" });
+
+    const signIn = (email: string) =>
+      browser(app)("/api/auth/sign-in/email", {
+        method: "POST",
+        body: { email, password: "correct horse battery" },
+      });
+    expect((await signIn("chair@example.com")).status).toBe(401);
+    expect((await signIn("aaron@example.com")).status).toBe(200);
+
+    expect((await browser(app)("/api/me", { method: "PATCH", body: { name: "X" } })).status).toBe(
+      401,
+    );
+  });
 });

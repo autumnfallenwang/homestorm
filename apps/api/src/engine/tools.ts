@@ -132,16 +132,6 @@ export function searchUrls(meta: Record<string, unknown> | null): string[] {
     .filter((u): u is string => typeof u === "string");
 }
 
-/** The chair's search, as the one message every seat reads. */
-export function sourcesContent(query: string, meta: Record<string, unknown> | null): string {
-  const lines = searchResults(meta).map((r, i) => {
-    const published = typeof r.published === "string" ? ` (${r.published})` : "";
-    const snippet = typeof r.snippet === "string" && r.snippet ? `: ${r.snippet}` : "";
-    return `${i + 1}. [${String(r.title ?? r.url)}](${String(r.url)})${published}${snippet}`;
-  });
-  return `Results for "${query}":\n\n${lines.join("\n")}`;
-}
-
 /** The research so far, as plain text for the forced final answer. */
 export function researchNote(research: readonly string[]): string {
   const body = research.map((r) => r.slice(0, RESEARCH_CHARS_PER_CALL)).join("\n\n---\n\n");

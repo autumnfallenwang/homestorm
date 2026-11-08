@@ -66,7 +66,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
   const [effort, setEffort] = useState<ReasoningEffort>("low");
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
-  const [web, setWeb] = useState<WebAccess>("off");
+  const [web, setWeb] = useState<WebAccess | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
     setEffort("low");
     setLength(null);
     setBudget(null);
-    setWeb("off");
+    setWeb(null);
     setQuery("");
   }
 
@@ -309,7 +309,9 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
               )}
               standard={data?.standardContextBudget ?? null}
             />
-            {data?.webTools && <WebAccessSelect value={web} onChange={setWeb} />}
+            {(data?.webTools || state.meeting.webAccess !== "off") && (
+              <WebAccessSelect value={web} onChange={setWeb} roomRule={state.meeting.webAccess} />
+            )}
           </div>
         )}
 

@@ -4,6 +4,49 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-08
+
+- **Settings, with Profile and Appearance** ([ADR 0018](adr/0018-settings-profile-and-appearance.md)). Asked for by the
+  user, modeled on homework's settings, with Change password moved into Profile.
+  - **The area:** `/settings`, with its own sidebar (Back to meetings, Profile, Appearance) that is an icon rail on
+    phones. You open it from the profile menu, which now holds Settings and Sign out and also sits at the bottom of
+    the folded meetings rail. The Change password dialog is gone.
+  - **Profile:** name and sign-in email through a new `PATCH /api/me`, which stores the email lower case and answers
+    409 for an email in use. Then the password: current, new and confirm. The profile menu shows a new name at once.
+  - **Appearance, per browser:**
+    - Homework's palettes (Default is homestorm's own, then Solarized, Nord, Dracula, High contrast), mapped onto
+      homestorm's color tokens. Each palette's accent is its primary color, and the source colors stay fixed.
+    - Light, Dark or System (the default).
+    - A size from 75 to 150%, which scales the root font size.
+    - An inline `<head>` script applies these before the first paint, and `ThemeProvider` follows later changes.
+    - Code blocks get GitHub Dark colors in dark mode.
+    - A unit test runs that script against a stand-in page. It caught a stored palette named "constructor" passing
+      the lookup, now fixed.
+  - **Checked in a real browser**, on a scratch database:
+    - The menu opens Settings. A name change shows in the menu at once.
+    - A wrong current password is refused, and the right one changes it.
+    - Dark mode switches at once, and reads well on a live meeting, including a highlighted code block.
+    - Nord at 115% applies on reload before React starts.
+    - At phone width, the sidebar becomes an icon rail.
+  - **Tests:** `PATCH /api/me` against Postgres. It checks validation, a lower-cased email, that the session carries
+    on, that the new email signs in and the old one doesn't, and that it needs a session.
+
+- **Web tools became a room rule, and the chair's "Search the web" was removed**
+  ([ADR 0017](adr/0017-web-tools-room-rule.md)). Asked for by the user, who didn't need the chair's search and wanted
+  web tools set once for the room, as answer length is.
+  - **Removed:** the button in the message box, `POST /api/meetings/:id/search`, `engine.search()`, and the helper that
+    wrote its message. Old Sources messages (one in the live data) still show, seats still read them, and their
+    links still count for the URL rule.
+  - **Added:** `meetings.web_access`, starting Off, in the Room rules box as Off / Can search / Must search first. A
+    seat's `web_access` is now null by default and follows it. The seat dialogs offer "Room rule (now …)" or the
+    seat's own setting. Changes add event lines, and the export lists each seat's effective setting.
+  - **Migration 0007:** seats with web tools off were set to follow the room rule; seats with them on kept that. Run
+    on a copy of the live data (a backup taken just before, `homestorm-20261108T062747Z.dump`): 13 seats now follow
+    the room rule, 9 keep "on", the 6 meetings start Off, and all 76 messages are there.
+  - **Tests:** the chair-search tests became room-rule tests (a seat follows it, its own setting wins either way, and
+    Must search first forces the search) and old-Sources tests. Plus a route test for the rule, its events and the
+    export, and that `/search` is gone.
+
 ## 2026-11-07
 
 - **Nightly database backup** (the user's "go 1"). The database had no backup, and attachments live in it.

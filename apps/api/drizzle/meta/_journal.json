@@ -50,6 +50,13 @@
       "when": 1793927650263,
       "tag": "0006_web_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794119054515,
+      "tag": "0007_web_access_room_rule",
+      "breakpoints": true
     }
   ]
 }

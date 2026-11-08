@@ -41,7 +41,10 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 
 /** Who wrote a message. `event` is a transcript line such as "You muted Claude Sonnet 5.5". */
 /** `brief`: a version of the meeting brief (ADR 0015). It enters the record on the clock but isn't a message seats read. */
-/** `sources`: web search results the chair posted (ADR 0014). Every seat reads them. */
+/**
+ * `sources`: web search results the chair posted (ADR 0014). Every seat reads them. The chair's search was removed on
+ * 2026-11-08 (ADR 0017); older meetings still hold these messages.
+ */
 export const AUTHOR_KINDS = ["chair", "seat", "event", "brief", "sources"] as const;
 export type AuthorKind = (typeof AUTHOR_KINDS)[number];
 
@@ -58,7 +61,7 @@ export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
 
 /**
  * What a seat may do on the web (ADR 0014). `must` makes it search before answering, for when the chair wants an answer
- * checked against current sources.
+ * checked against current sources. A room rule, which a seat follows unless it has its own (ADR 0017).
  */
 export const WEB_ACCESS = ["off", "on", "must"] as const;
 export type WebAccess = (typeof WEB_ACCESS)[number];
@@ -129,6 +132,8 @@ export interface Meeting {
   id: string;
   title: string;
   answerLength: AnswerLength;
+  /** Room rule: what seats may do on the web, unless a seat has its own (ADR 0017). */
+  webAccess: WebAccess;
   /** Logical clock: bumped each time a message enters the shared record. See docs/data-model.md. */
   clock: number;
   createdAt: string;
@@ -151,8 +156,8 @@ export interface Seat {
   answerLength: AnswerLength | null;
   /** How much of the meeting its view may hold; null is Standard (ADR 0012). */
   contextBudget: ContextBudget | null;
-  /** Whether it may use the web (ADR 0014). */
-  webAccess: WebAccess;
+  /** What it may do on the web; null follows the room rule (ADR 0017). */
+  webAccess: WebAccess | null;
   /** Removed seats stay so their old messages keep a name. */
   removedAt: string | null;
   createdAt: string;
@@ -257,6 +262,7 @@ export const UpdateMeetingInput = z
   .object({
     title: z.string().trim().min(1).max(200),
     answerLength: z.enum(ANSWER_LENGTHS),
+    webAccess: z.enum(WEB_ACCESS),
   })
   .partial();
 export type UpdateMeetingInput = z.infer<typeof UpdateMeetingInput>;
@@ -288,10 +294,6 @@ export function briefAt(
   return brief;
 }
 
-/** The chair's "Search the web" action (ADR 0014). */
-export const SearchInput = z.object({ query: z.string().trim().min(1).max(400) });
-export type SearchInput = z.infer<typeof SearchInput>;
-
 export const AddSeatInput = z.object({
   model: z.string().trim().min(1).max(200),
   displayName: z.string().trim().min(1).max(60).optional(),
@@ -301,8 +303,8 @@ export const AddSeatInput = z.object({
   answerLength: z.enum(ANSWER_LENGTHS).nullable().optional(),
   /** Omitted or null: Standard. */
   contextBudget: z.enum(CONTEXT_BUDGETS).nullable().optional(),
-  /** Omitted: off. */
-  webAccess: z.enum(WEB_ACCESS).optional(),
+  /** Omitted or null: follow the room rule. */
+  webAccess: z.enum(WEB_ACCESS).nullable().optional(),
 });
 export type AddSeatInput = z.infer<typeof AddSeatInput>;
 
@@ -316,7 +318,8 @@ export const UpdateSeatInput = z
     answerLength: z.enum(ANSWER_LENGTHS).nullable(),
     /** null: back to Standard. */
     contextBudget: z.enum(CONTEXT_BUDGETS).nullable(),
-    webAccess: z.enum(WEB_ACCESS),
+    /** null: back to the room rule. */
+    webAccess: z.enum(WEB_ACCESS).nullable(),
   })
   .partial();
 export type UpdateSeatInput = z.infer<typeof UpdateSeatInput>;
@@ -330,6 +333,14 @@ export function seatAnswerLength(
   meeting: Pick<Meeting, "answerLength">,
 ): AnswerLength {
   return seat.answerLength ?? meeting.answerLength;
+}
+
+/** What a seat may do on the web (ADR 0017): its own setting, or else the room rule. */
+export function seatWebAccess(
+  seat: Pick<Seat, "webAccess">,
+  meeting: Pick<Meeting, "webAccess">,
+): WebAccess {
+  return seat.webAccess ?? meeting.webAccess;
 }
 
 export const MoveSeatInput = z.object({ direction: z.enum(["up", "down"]) });

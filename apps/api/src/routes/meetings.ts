@@ -4,18 +4,18 @@
 //   GET    /api/meetings                               meetings list
 //   POST   /api/meetings                               create { title, brief? }
 //   GET    /api/meetings/:id                           the whole meeting (MeetingState)
-//   PATCH  /api/meetings/:id                           rename, answer length (a change adds an event line)
+//   PATCH  /api/meetings/:id                           rename, the room rules: answer length, web tools (a change adds
+//                                                      an event line)
 //   DELETE /api/meetings/:id
 //   PUT    /api/meetings/:id/brief                     set, change or clear the brief { content, keepAttachmentIds?, attachments? }
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
 //   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort?, webAccess? }
-//   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort, web access
+//   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort, answer length, context, web tools
 //                                                      (a name another seat has, or had, is 409)
 //   POST   /api/meetings/:id/seats/:seatId/move        { direction: up | down }
 //   DELETE /api/meetings/:id/seats/:seatId             remove from the meeting
 //   POST   /api/meetings/:id/actions                   the one action API { text, mode, targets, replyTo, attachments } (ADR 0006)
-//   POST   /api/meetings/:id/search                    the chair's web search { query }, posted as one message (ADR 0014)
 //   POST   /api/meetings/:id/wrap-up                   { seatId, kind, post }
 //   POST   /api/meetings/:id/stop                      { messageId? }
 //   POST   /api/meetings/:id/messages/:mid/retry|keep|skip|post
@@ -30,7 +30,6 @@ import {
   type MeetingEvent,
   MoveSeatInput,
   prettyModelName,
-  SearchInput,
   SendActionInput,
   SetBriefInput,
   type Source,
@@ -81,10 +80,10 @@ function fail(c: Ctx, err: unknown): Response {
   throw err;
 }
 
-const WEB_ACCESS_EVENT: Record<WebAccess, string> = {
-  off: "turned off web tools for",
-  on: "let web tools be used by",
-  must: "told this seat to search before answering:",
+const WEB_LABEL: Record<WebAccess, string> = {
+  off: "Off",
+  on: "Can search",
+  must: "Must search first",
 };
 
 const LENGTH_LABEL: Record<AnswerLength, string> = { concise: "Concise", detailed: "Detailed" };
@@ -189,6 +188,9 @@ export function meetingRoutes(deps: MeetingDeps) {
     // The room rule shapes every later turn, so the transcript and the export record when it changed.
     if (meeting.answerLength !== before.answerLength) {
       await engine.addEvent(meeting.id, `You set answers to ${LENGTH_LABEL[meeting.answerLength]}`);
+    }
+    if (meeting.webAccess !== before.webAccess) {
+      await engine.addEvent(meeting.id, `You set web tools to ${WEB_LABEL[meeting.webAccess]}`);
     }
     return c.json(meeting);
   });
@@ -312,7 +314,7 @@ export function meetingRoutes(deps: MeetingDeps) {
       reasoningEffort: input.reasoningEffort ?? "low",
       answerLength: input.answerLength ?? null,
       contextBudget: input.contextBudget ?? null,
-      ...(input.webAccess ? { webAccess: input.webAccess } : {}),
+      webAccess: input.webAccess ?? null,
     });
     engine.emit(id, { type: "seat", seat });
     await engine.addEvent(id, `You added ${seat.displayName}`);
@@ -360,7 +362,12 @@ export function meetingRoutes(deps: MeetingDeps) {
       );
     }
     if (input.webAccess !== undefined && input.webAccess !== before.webAccess) {
-      await engine.addEvent(id, `You ${WEB_ACCESS_EVENT[seat.webAccess]} ${seat.displayName}`);
+      await engine.addEvent(
+        id,
+        seat.webAccess
+          ? `You set ${seat.displayName}'s web tools to ${WEB_LABEL[seat.webAccess]}`
+          : `You set ${seat.displayName}'s web tools back to the room rule`,
+      );
     }
     return c.json(seat);
   });
@@ -410,16 +417,6 @@ export function meetingRoutes(deps: MeetingDeps) {
     if (input instanceof Response) return input;
     try {
       return c.json(await engine.send(c.req.param("id"), input), 202);
-    } catch (err) {
-      return fail(c, err);
-    }
-  });
-
-  app.post("/meetings/:id/search", async (c) => {
-    const input = await parse(c, SearchInput);
-    if (input instanceof Response) return input;
-    try {
-      return c.json(await engine.search(c.req.param("id"), input.query), 201);
     } catch (err) {
       return fail(c, err);
     }

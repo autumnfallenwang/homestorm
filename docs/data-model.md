@@ -9,8 +9,8 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 
 | Table | One row per | Key fields |
 |---|---|---|
-| `meetings` | meeting | `title`; room rule `answer_length` (concise / detailed); `clock` |
-| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `web_access` (off / on / must), `removed_at` |
+| `meetings` | meeting | `title`; room rules `answer_length` (concise / detailed) and `web_access` (off / on / must); `clock` |
+| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `web_access` (off / on / must; null: follow the room rule), `removed_at` |
 | `rounds` | time the chair gives the floor | `number`, `mode` (blind / in_turn / single / wrap_up), `seat_ids` in answering order, `prompt_message_id`, `reply_to_id`, `wrap_kind`, `status` |
 | `messages` | transcript entry | `author_kind` (chair / seat / event / brief / sources), `seat_id`, `round_id`, `content`, `status`, `visible_seq`, `cutoff_seq`, `tool_calls` (what a seat searched and read), tracing fields |
 | `attachments` | image or text file on a chair message or a brief version | `message_id`, `position`, `kind` (image / text), `name`, `mime`, `size_bytes`, `width`, `height`, `text_chars`, `data` (bytea) ([ADR 0016](adr/0016-attachments-images-and-text-files.md)) |
@@ -29,9 +29,10 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 - **Attachments never change once saved.** A new brief version copies the files it keeps, so each version is whole
   and Retry rebuilds the same view. Deleting a meeting deletes its files.
 - **Search results** the chair posted are messages with `author_kind = 'sources'`, on the clock, so a blind round shares
-  them or doesn't by its cutoff, like any message ([ADR 0014](adr/0014-tools-through-mcpgw.md)).
+  them or doesn't by its cutoff, like any message ([ADR 0014](adr/0014-tools-through-mcpgw.md)). The chair's search was
+  removed on 2026-11-08 ([ADR 0017](adr/0017-web-tools-room-rule.md)), so only older meetings have them.
 - **Event lines** ("You muted Claude Sonnet 5.5 for rounds") are messages with `author_kind = 'event'`. Seats never
-  see them. Room-rule changes ("You set answers to Detailed") and posting a wrap-up ("You posted Scribe's decision")
+  see them. Room-rule changes ("You set answers to Detailed", "You set web tools to Can search") and posting a wrap-up ("You posted Scribe's decision")
   add one too, so the transcript and the export show when they happened.
 - **Tracing fields** on seat messages: `model`, `owned_by`, `reasoning_effort`, `usage` (with an `estimated` flag),
   `cost_usd`, `llmgw_req_id`, `request_id` (homestorm's, sent as `X-Request-Id`), `trimmed_count`, `view_tokens` (the

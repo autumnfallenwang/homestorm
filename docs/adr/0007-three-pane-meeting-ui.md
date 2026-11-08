@@ -12,7 +12,10 @@ user reviewed and approved a mockup ("looking perfect"). The mockup itself is ke
 ## Decision
 
 - **Left: meetings list.** New meeting, search, meetings grouped by day. Each meeting has a ⋯ menu with **Delete
-  meeting…**, which asks again inside the menu ("Yes, delete it" / Cancel) instead of opening a dialog.
+  meeting…**, which asks again inside the menu ("Yes, delete it" / Cancel) instead of opening a dialog. At the bottom,
+  the chair's profile menu: Settings and Sign out. **Settings** (since 2026-11-08,
+  [ADR 0018](0018-settings-profile-and-appearance.md)) replaces this pane with its own: Back to meetings, Profile,
+  Appearance.
 - **Middle: the meeting.**
   - **Header:** title, status, tokens and DeepSeek spend, Brief, Export, Wrap up. **Brief** shows the meeting brief
     pinned under the header, where it stays while the transcript scrolls (it used to be a card at the top of the
@@ -25,7 +28,7 @@ user reviewed and approved a mockup ("looking perfect"). The mockup itself is ke
   - **Message box:** the send-to selector (default *Everyone · blind*), @mentions, Stop all and Send.
 - **Right: seats panel.**
   - One card per seat: model, source, status, allowance bar, and Ask / Mute / ⋯.
-  - A Room rules box at the bottom: answer length, and the two fixed rules. (It also had "New questions go to"
+  - A Room rules box at the bottom: answer length, web tools (since 2026-11-08, ADR 0017), and the two fixed rules. (It also had "New questions go to"
     until 2026-11-03; that duplicated the message box's selector, so it was removed.)
 - **Both side panels fold** (since 2026-11-07) into a narrow rail on wide screens: the meetings rail keeps Show and New
   meeting; the seats rail keeps Show, Add seat and each seat's avatar with its status. The browser remembers each

@@ -145,7 +145,7 @@ function ReplyQuote({ targetId }: { targetId: string }) {
   if (!target) return null;
   const author = target.authorKind === "chair" ? "You" : seatName(target.seatId);
   return (
-    <div className="mb-1.5 rounded-md border-l-2 border-current/40 bg-black/5 px-2 py-1 text-xs opacity-90">
+    <div className="mb-1.5 rounded-md border-l-2 border-current/40 bg-current/5 px-2 py-1 text-xs opacity-90">
       <span className="font-medium">{author}</span>
       <span className="line-clamp-2">{plainText(stripSpeakerTag(target.content))}</span>
     </div>

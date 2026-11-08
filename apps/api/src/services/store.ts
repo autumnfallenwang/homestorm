@@ -72,6 +72,7 @@ export function toMeeting(r: MeetingRow): Meeting {
     id: r.id,
     title: r.title,
     answerLength: r.answerLength as AnswerLength,
+    webAccess: r.webAccess as WebAccess,
     clock: r.clock,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -91,7 +92,7 @@ export function toSeat(r: SeatRow): Seat {
     reasoningEffort: r.reasoningEffort as ReasoningEffort,
     answerLength: r.answerLength as AnswerLength | null,
     contextBudget: r.contextBudget as ContextBudget | null,
-    webAccess: r.webAccess as WebAccess,
+    webAccess: r.webAccess as WebAccess | null,
     removedAt: iso(r.removedAt),
     createdAt: r.createdAt.toISOString(),
   };
@@ -186,7 +187,7 @@ export function createStore(db: Database) {
 
     async updateMeeting(
       id: string,
-      patch: Partial<Pick<MeetingRow, "title" | "answerLength">>,
+      patch: Partial<Pick<MeetingRow, "title" | "answerLength" | "webAccess">>,
     ): Promise<Meeting | null> {
       const [row] = await db
         .update(meetings)
@@ -260,7 +261,7 @@ export function createStore(db: Database) {
       reasoningEffort: ReasoningEffort;
       answerLength?: AnswerLength | null;
       contextBudget?: ContextBudget | null;
-      webAccess?: WebAccess;
+      webAccess?: WebAccess | null;
     }): Promise<Seat> {
       const [max] = await db
         .select({ value: sql<number>`coalesce(max(${seats.position}), -1)::int` })

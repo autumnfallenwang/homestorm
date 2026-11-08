@@ -20,6 +20,9 @@ network who can open the app could spend them (D3 in [plan.md](../plan.md)).
   unset in local dev.
 - **Forgotten password:** a `reset-password` script, run with `kubectl exec`, prints a one-time password.
 - Sessions last 7 days and refresh daily. Sign-in is rate-limited per IP.
+- **Changing the login** (added 2026-11-08, [ADR 0018](0018-settings-profile-and-appearance.md)): Settings → Profile
+  changes the name, the sign-in email (`PATCH /api/me`) and the password (Better Auth's `change-password`, which
+  signs out other devices).
 
 ## Alternatives considered
 

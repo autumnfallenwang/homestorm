@@ -37,7 +37,10 @@ import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { WebAccessSelect } from "./web-access-select";
 
-/** Edit name, persona, thinking effort, answer length and context budget. The model can't change: that would be a different seat. */
+/**
+ * Edit name, persona, thinking effort, answer length, context budget and web tools. The model can't change: that would
+ * be a different seat.
+ */
 export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: () => void }) {
   const { id, state, act, models, standardContextBudget, webTools } = useRoom();
   const [name, setName] = useState("");
@@ -45,7 +48,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
   const [effort, setEffort] = useState<ReasoningEffort>("low");
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
-  const [web, setWeb] = useState<WebAccess>("off");
+  const [web, setWeb] = useState<WebAccess | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -144,7 +147,9 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
             )}
             standard={standardContextBudget}
           />
-          {(webTools || web !== "off") && <WebAccessSelect value={web} onChange={setWeb} />}
+          {(webTools || (web ?? state.meeting.webAccess) !== "off") && (
+            <WebAccessSelect value={web} onChange={setWeb} roomRule={state.meeting.webAccess} />
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

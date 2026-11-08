@@ -84,13 +84,18 @@ export const meetings = pgTable(
     title: text().notNull(),
     // Room rule: how long answers should be (ADR 0012). Blind or in turn is chosen per message, in the message box.
     answerLength: text().notNull().default("concise"),
+    // Room rule: what seats may do on the web, off / on / must, unless a seat has its own (ADR 0017).
+    webAccess: text().notNull().default("off"),
     // Logical clock: +1 each time a message enters the shared record. A seat's turn sees messages whose
     // visible_seq <= the clock when the turn started (the visibility rule, ADR 0005).
     clock: integer().notNull().default(0),
     createdAt: createdAt(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check("meetings_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`)],
+  (t) => [
+    check("meetings_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`),
+    check("meetings_web_access_valid", sql`${t.webAccess} IN ('off', 'on', 'must')`),
+  ],
 );
 
 export const seats = pgTable(
@@ -112,8 +117,8 @@ export const seats = pgTable(
     answerLength: text(),
     // How much of the meeting its view may hold: small / standard / large / full; null is standard (ADR 0012).
     contextBudget: text(),
-    // What it may do on the web: off / on / must (ADR 0014).
-    webAccess: text().notNull().default("off"),
+    // What it may do on the web: off / on / must; null follows the meeting's room rule (ADR 0017).
+    webAccess: text(),
     // Removed seats stay, so their earlier messages keep a name in every view.
     removedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
@@ -194,7 +199,7 @@ export const messages = pgTable(
     // The view's size by the budget estimate when the turn started.
     viewTokens: integer(),
     stoppedEarly: boolean().notNull().default(false),
-    // Tool calls during this turn, or the search behind a `sources` message (ADR 0014).
+    // Tool calls during this turn, or the search behind a `sources` message (ADR 0014; none since 2026-11-08).
     toolCalls: jsonb().$type<ToolActivity[]>().notNull().default([]),
     createdAt: createdAt(),
     startedAt: timestamp({ withTimezone: true }),

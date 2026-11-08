@@ -10,25 +10,48 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/** Whether a seat may use the web (ADR 0014). The chair's own "Search the web" is separate, and always fair to all. */
+/** Short names, for the room rule and the "Room rule (now …)" option. */
+export const WEB_LABEL: Record<WebAccess, string> = {
+  off: "Off",
+  on: "Can search",
+  must: "Must search first",
+};
+
+/** What the seat card says when a seat has its own setting. */
+export const WEB_CARD_LABEL: Record<WebAccess, string> = {
+  off: "no web tools",
+  on: "web tools",
+  must: "searches first",
+};
+
+/**
+ * What a seat may do on the web (ADR 0017): the room rule by default, or its own. null means "follow the room rule",
+ * and the option names what that is right now.
+ */
 export function WebAccessSelect({
   value,
   onChange,
+  roomRule,
 }: {
-  value: WebAccess;
-  onChange: (v: WebAccess) => void;
+  value: WebAccess | null;
+  onChange: (v: WebAccess | null) => void;
+  roomRule: WebAccess;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>Web tools</Label>
-      <Select value={value} onValueChange={(v) => onChange(v as WebAccess)}>
+      <Select
+        value={value ?? "room"}
+        onValueChange={(v) => onChange(v === "room" ? null : (v as WebAccess))}
+      >
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="off">Off</SelectItem>
-          <SelectItem value="on">Can search and read pages</SelectItem>
-          <SelectItem value="must">Must search before answering</SelectItem>
+          <SelectItem value="room">Room rule (now {WEB_LABEL[roomRule]})</SelectItem>
+          <SelectItem value="off">Off, always</SelectItem>
+          <SelectItem value="on">Can search and read pages, always</SelectItem>
+          <SelectItem value="must">Must search before answering, always</SelectItem>
         </SelectContent>
       </Select>
       <p className="text-xs text-muted-foreground">

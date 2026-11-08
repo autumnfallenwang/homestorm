@@ -1,6 +1,6 @@
 "use client";
 
-import { canTakeFloor, type Seat } from "@homestorm/shared";
+import { canTakeFloor, type Seat, WEB_ACCESS, type WebAccess } from "@homestorm/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -38,6 +38,7 @@ import { LENGTH_LABEL } from "./answer-length-select";
 import { BUDGET_LABEL } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
+import { WEB_CARD_LABEL, WEB_LABEL } from "./web-access-select";
 
 /**
  * Right pane on wide screens (ADR 0007): seat cards, then the room rules. `onFold` hides it: into the rail on wide
@@ -163,8 +164,7 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
             {seat.contextBudget &&
               seat.contextBudget !== "standard" &&
               ` · ${BUDGET_LABEL[seat.contextBudget]} context`}
-            {seat.webAccess === "on" && " · web tools"}
-            {seat.webAccess === "must" && " · searches first"}
+            {seat.webAccess && ` · ${WEB_CARD_LABEL[seat.webAccess]}`}
           </p>
         </div>
         <span className={cn("shrink-0 text-xs font-medium", STATUS_TONE[status])}>{status}</span>
@@ -296,7 +296,7 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
 }
 
 function RoomRules() {
-  const { id, state, act } = useRoom();
+  const { id, state, act, webTools } = useRoom();
   const m = state.meeting;
   return (
     <section className="border-t px-4 py-3" aria-label="Room rules">
@@ -321,6 +321,27 @@ function RoomRules() {
             </SelectContent>
           </Select>
         </label>
+        {/* ADR 0017: seats follow this unless they have their own. Hidden while mcpgw is unreachable and it's Off. */}
+        {(webTools || m.webAccess !== "off") && (
+          <label className="flex items-center justify-between gap-2">
+            <span className="whitespace-nowrap text-muted-foreground">Web tools</span>
+            <Select
+              value={m.webAccess}
+              onValueChange={(v) => act(() => api.updateMeeting(id, { webAccess: v as WebAccess }))}
+            >
+              <SelectTrigger size="sm" className="h-7 w-40 text-xs" aria-label="Web tools">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WEB_ACCESS.map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {WEB_LABEL[w]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        )}
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Check className="size-3.5 text-ok" /> Seats speak only when called
         </p>

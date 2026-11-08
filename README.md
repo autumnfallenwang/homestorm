@@ -15,8 +15,8 @@ It replaces copy-pasting the same question between the Claude, ChatGPT and Gemin
   you asked for and never falls back to another.
 - **One shared transcript, a separate view for each seat.** A model's own messages are `assistant`; everyone else's,
   the chair included, are `user` with a speaker tag.
-- **Web tools come through mcpgw,** the home tool gateway. The chair can post a search every seat reads, and seats the
-  chair allows can search and read pages themselves, with their sources shown under each answer.
+- **Web tools come through mcpgw,** the home tool gateway. A room rule, which each seat can override, lets seats search
+  and read pages themselves, with their sources shown under each answer.
 - **The chair runs it:** blind rounds (independent answers), in-turn rounds (discussion), @mentions, replies to a
   specific message, mute, stop and retry, wrap up into minutes.
 
@@ -59,6 +59,8 @@ Argo CD Application in `arch-infra` (`apps/homestorm.yaml`; review copy in `depl
 - **Backups:** a CronJob dumps the database every night at 03:30 (New York) into the `homestorm-backup` volume and
   keeps the newest 14. It's the same disk as the database, so copy one elsewhere for a lost disk.
   `scripts/backup.sh list | now | fetch <name> | restore <file>`; logs: `{namespace="homestorm"} | json | event=~"backup.*"`.
+- **Your name, email, password and the app's look:** Settings, from the profile menu at the bottom of the meetings
+  list.
 - **Forgotten password:**
   `kubectl -n homestorm exec deploy/homestorm-api -- node --import tsx src/scripts/reset-password.ts <email>`.
 - **Logs:** `{namespace="homestorm"} | json`. One request and every seat turn it started:
@@ -102,3 +104,5 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0014](docs/adr/0014-tools-through-mcpgw.md) | Tools (web search and page reading) come from mcpgw, the tool gateway; homestorm runs the tool loop, and enforces which URLs a seat may read |
 | [0015](docs/adr/0015-meeting-brief-and-full-context-policy.md) | A meeting brief every seat always sees; when a view is full, keep the start, the latest posted wrap-up and the newest turns |
 | [0016](docs/adr/0016-attachments-images-and-text-files.md) | Images and text files on messages and the brief: thumbnails, a full-size viewer, inline text files, image tokens in budgets |
+| [0017](docs/adr/0017-web-tools-room-rule.md) | Web tools are a room rule each seat can override; the chair's "Search the web" is removed |
+| [0018](docs/adr/0018-settings-profile-and-appearance.md) | Settings, after homework's: Profile (name, email, password) and Appearance (palette, light or dark, size, per browser) |

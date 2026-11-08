@@ -1,4 +1,5 @@
-import { count } from "drizzle-orm";
+import { UpdateMeInput } from "@homestorm/shared";
+import { count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -6,6 +7,7 @@ import { auth } from "./auth.js";
 import { config } from "./config.js";
 import { db } from "./db/index.js";
 import { users } from "./db/schema.js";
+import { log } from "./lib/logger.js";
 import {
   type AuthVariables,
   authorize,
@@ -60,6 +62,40 @@ export function createApp(options: AppOptions = {}) {
   // Everything under /api/* past this point needs the session.
   app.use("/api/*", authorize(resolveSession));
   app.get("/api/me", (c) => c.json({ user: c.get("user") }));
+
+  // Settings → Profile (ADR 0018): the admin's name, or the email they sign in with. The session stays; the new
+  // email works at the next sign-in.
+  app.patch("/api/me", async (c) => {
+    const parsed = UpdateMeInput.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success)
+      return c.json({ error: "Validation failed", details: parsed.error.issues }, 400);
+    const me = c.get("user");
+    const { name, email } = parsed.data;
+    try {
+      const [row] = await db
+        .update(users)
+        .set({
+          ...(name !== undefined ? { name } : {}),
+          ...(email !== undefined && email !== me.email ? { email, emailVerified: false } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, me.id))
+        .returning();
+      if (!row) return c.json({ error: "Not found" }, 404);
+      log.info(
+        { event: "account.updated", fields: Object.keys(parsed.data) },
+        "the admin changed their login",
+      );
+      return c.json({ user: { id: row.id, name: row.name, email: row.email } });
+    } catch (err) {
+      // users.email is unique. One admin makes this rare, but it's a clear answer rather than a 500.
+      // drizzle wraps the driver's error, so the Postgres code may be on its cause.
+      const e = err as { code?: string; cause?: { code?: string } };
+      if ((e.code ?? e.cause?.code) === "23505")
+        return c.json({ error: "Another login already uses that email." }, 409);
+      throw err;
+    }
+  });
 
   options.mount?.(app);
 
