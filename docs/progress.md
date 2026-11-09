@@ -15,8 +15,8 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **Profile's password form** gets a real (hidden) username field. Chrome doesn't count `type="hidden"` and said so
     in the console, so password managers couldn't tie a new password to the login.
   - **CI's arch-infra bump** takes `ARCH_INFRA_DEPLOY_KEY` (a deploy key that can push to arch-infra only) or
-    `ARCH_INFRA_TOKEN`. Neither is set yet: making the key and storing it as a secret is for the user (commands in
-    the README under Deploy); auto mode doesn't write secrets.
+    `ARCH_INFRA_TOKEN`. The user set `ARCH_INFRA_DEPLOY_KEY` (the deploy key "homestorm CI: bump image tags", write
+    access on arch-infra only); auto mode doesn't write secrets, so the commands in the README were theirs to run.
   - **Deployed as `253b120`** (arch-infra `372f195`, tags by hand): Argo CD shows homestorm Synced and Healthy for the
     first time since 2026-11-03, with the database pod untouched (no restart); the Profile page's console is clean.
 
