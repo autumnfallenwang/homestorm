@@ -12,6 +12,8 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   first: DeepSeek V4 Pro 54 output tokens with `none` against 308 with `low`; Claude Haiku and GPT-6 Luna take `none`
   too. Migration 0009 widens `seats.reasoning_effort`. The seat card and the answer line say "thinking off". Low stays
   the default.
+  Deployed as `e0b9b95` and checked in the test meeting: the same question to DeepSeek V4 Pro took 11 s and 499
+  output tokens at Low, and 6.4 s and 269 at Off, with the same advice; the answer line says "thinking off".
 
 - **Tuning from real meetings, first pass.** All 73 seat turns on the cluster (6 meetings, no errors):
   - **Web calls:** 12 of the 26 turns with web tools used all 6 calls: 4 of 6 for Claude Haiku 5.5, 5 of 8 for
