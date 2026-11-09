@@ -1,6 +1,6 @@
 "use client";
 
-import type { Limits, MeetingState, Message, ModelInfo, Seat } from "@homestorm/shared";
+import type { Limits, MeetingState, Message, ModelInfo, Poll, Seat } from "@homestorm/shared";
 import { createContext, useContext } from "react";
 
 export interface Room {
@@ -22,6 +22,8 @@ export interface Room {
   act: (fn: () => Promise<unknown>) => Promise<boolean>;
   openReply: (target: Message) => void;
   openWrapUp: () => void;
+  /** Open the poll dialog (ADR 0020), optionally with a poll to start from. */
+  openPoll: (start?: Poll) => void;
   /** Open the brief editor, optionally pre-filled (e.g. a wrap-up to copy in). */
   openBrief: (draft?: string) => void;
   openEditSeat: (seat: Seat) => void;

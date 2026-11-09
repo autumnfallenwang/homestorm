@@ -11,6 +11,7 @@ import type {
   MeetingSummary,
   Message,
   MessageStatus,
+  Poll,
   ReasoningEffort,
   Round,
   RoundMode,
@@ -108,6 +109,7 @@ export function toRound(r: RoundRow): Round {
     promptMessageId: r.promptMessageId,
     replyToId: r.replyToId,
     wrapKind: r.wrapKind as WrapKind | null,
+    poll: r.poll ?? null,
     status: r.status as RoundStatus,
     createdAt: r.createdAt.toISOString(),
     finishedAt: iso(r.finishedAt),
@@ -330,6 +332,7 @@ export function createStore(db: Database) {
       promptMessageId: string | null;
       replyToId: string | null;
       wrapKind: WrapKind | null;
+      poll?: Poll | null;
     }): Promise<Round> {
       const [max] = await db
         .select({ value: sql<number>`coalesce(max(${rounds.number}), 0)::int` })

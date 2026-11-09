@@ -6,6 +6,13 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Polls** ([ADR 0020](adr/0020-polls.md)). Poll in the meeting header: a question and up to 6 options (or none).
+  Every unmuted seat answers at once, privately, with no web tools, in one line: `Choice · Confidence % · Why`. The
+  round box shows a tally and a row per seat; "Poll again" asks the same and shows how each seat moved ("+15 pts",
+  "was Neither"). The line is read leniently (bold, other separators, separate lines); an answer it can't read shows
+  whole below the table. Migration 0008 adds `rounds.poll` and the `poll` mode; the export writes a tally and a table.
+  10 new tests (parser, engine, route and export, floor note).
+
 - **Backups stay on the cluster.** The user decided no off-machine copy is needed; the plan's last open "by the user"
   item is closed.
 

@@ -90,7 +90,8 @@ export type Floor =
   | { kind: "direct"; replyTo?: ReplyTarget }
   | { kind: "blind"; count: number; replyTo?: ReplyTarget }
   | { kind: "in_turn"; index: number; count: number; replyTo?: ReplyTarget }
-  | { kind: "wrap_up"; wrapKind: WrapKind };
+  | { kind: "wrap_up"; wrapKind: WrapKind }
+  | { kind: "poll"; count: number; options: string[] };
 
 export interface ReplyTarget {
   author: string;
@@ -116,6 +117,7 @@ export function renderFloorNote(floor: Floor, answerLength?: AnswerLength): stri
   if (floor.kind === "wrap_up") {
     return `[Floor] The Chair asks you to wrap up the meeting. ${WRAP_TASK[floor.wrapKind]}`;
   }
+  if (floor.kind === "poll") return pollFloorNote(floor);
   const parts: string[] = [];
   if (floor.replyTo) {
     parts.push(
@@ -143,6 +145,21 @@ export function renderFloorNote(floor: Floor, answerLength?: AnswerLength): stri
   }
   if (answerLength === "concise") parts.push(CONCISE_REMINDER);
   return `[Floor] ${parts.join(" ")}`;
+}
+
+/**
+ * A poll (ADR 0020): one line in a fixed shape, so homestorm can put every seat's answer in one table. The shape is
+ * read leniently (`parsePollAnswer`), and the line stays readable as a message for later turns.
+ */
+function pollFloorNote(floor: { count: number; options: string[] }): string {
+  const choice = floor.options.length
+    ? `exactly one of: ${floor.options.join(" | ")}`
+    : "your answer in a few words";
+  return [
+    `[Floor] The Chair is taking a poll on the question above.${floor.count > 1 ? " Everyone answers independently: you can't see the others' answers and they can't see yours." : ""} Give your own view as it stands now.`,
+    "Reply with exactly this one line and nothing else:",
+    `Choice: <${choice}> · Confidence: <0–100>% · Why: <one short sentence>`,
+  ].join("\n");
 }
 
 function excerpt(text: string): string {

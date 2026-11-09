@@ -108,3 +108,4 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0017](docs/adr/0017-web-tools-room-rule.md) | Web tools are a room rule each seat can override; the chair's "Search the web" is removed |
 | [0018](docs/adr/0018-settings-profile-and-appearance.md) | Settings, after homework's: Profile (name, email, password) and Appearance (palette, light or dark, size, per browser) |
 | [0019](docs/adr/0019-pdf-and-word-files-read-in-the-browser.md) | PDF and Word files read into text in the browser, in a Web Worker; the server never parses them |
+| [0020](docs/adr/0020-polls.md) | Polls: every seat answers one question privately in one line (choice, confidence, why), shown as a tally and a table |

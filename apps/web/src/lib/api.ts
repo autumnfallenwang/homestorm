@@ -9,6 +9,7 @@ import type {
   MeetingSummary,
   Message,
   ModelInfo,
+  PollInput,
   Round,
   Seat,
   SendActionInput,
@@ -108,6 +109,9 @@ export const api = {
     ),
   wrapUp: (id: string, input: WrapUpInput) =>
     request<Round>("POST", `/api/meetings/${id}/wrap-up`, input),
+  /** A poll (ADR 0020): every active seat answers privately, in one line. */
+  poll: (id: string, input: PollInput) =>
+    request<{ message: Message; round: Round }>("POST", `/api/meetings/${id}/poll`, input),
   stop: (id: string, messageId?: string) =>
     request<{ ok: true }>("POST", `/api/meetings/${id}/stop`, messageId ? { messageId } : {}),
   retry: (id: string, messageId: string) =>

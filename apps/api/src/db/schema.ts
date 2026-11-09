@@ -4,7 +4,7 @@
 // (`casing: "snake_case"` in drizzle.config.ts and db/index.ts), status values as plain text checked by Zod and a
 // CHECK constraint, timestamps with time zone.
 
-import type { MessageError, ToolActivity, Usage } from "@homestorm/shared";
+import type { MessageError, Poll, ToolActivity, Usage } from "@homestorm/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -151,13 +151,15 @@ export const rounds = pgTable(
     promptMessageId: uuid(),
     replyToId: uuid(),
     wrapKind: text(),
+    // A poll round's question and options (ADR 0020); null otherwise.
+    poll: jsonb().$type<Poll>(),
     status: text().notNull().default("running"),
     createdAt: createdAt(),
     finishedAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     index("rounds_meeting_idx").on(t.meetingId, t.number),
-    check("rounds_mode_valid", sql`${t.mode} IN ('blind', 'in_turn', 'single', 'wrap_up')`),
+    check("rounds_mode_valid", sql`${t.mode} IN ('blind', 'in_turn', 'single', 'wrap_up', 'poll')`),
     check("rounds_status_valid", sql`${t.status} IN ('running', 'done', 'stopped')`),
   ],
 );

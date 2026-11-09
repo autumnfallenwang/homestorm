@@ -6,6 +6,10 @@ import {
   briefAt,
   type MeetingState,
   type Message,
+  type Poll,
+  type PollAnswer,
+  parsePollAnswer,
+  pollTally,
   type Round,
   type Seat,
   sourceLabel,
@@ -19,6 +23,7 @@ const MODE_LABEL: Record<Round["mode"], string> = {
   in_turn: "In turn",
   single: "One seat",
   wrap_up: "Wrap up",
+  poll: "Poll",
 };
 
 const WRAP_LABEL = {
@@ -91,6 +96,33 @@ export function exportMarkdown(
     if (brief) out.push(brief, "");
     if (currentBrief) out.push(...files(currentBrief));
   }
+  /** A poll's answers as a table, with the tally when it had options (ADR 0020). */
+  const pollTable = (r: Round, poll: Poll): string[] => {
+    const answers = messages
+      .filter((x) => x.roundId === r.id && x.authorKind === "seat" && x.status === "done")
+      .map((x) => ({ seat: name(x), a: parsePollAnswer(x.content, poll.options) }))
+      .filter((x): x is { seat: string; a: PollAnswer } => x.a !== null);
+    if (!answers.length) return [];
+    const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+    const tally = pollTally(
+      answers.map((x) => x.a),
+      poll.options,
+    )
+      .filter((t) => t.count > 0)
+      .map((t) => `${t.label} ${t.count}`)
+      .join(" · ");
+    return [
+      ...(poll.options.length ? [`**Tally:** ${tally}`, ""] : []),
+      "| Seat | Choice | Confidence | Why |",
+      "|---|---|---|---|",
+      ...answers.map(
+        ({ seat, a }) =>
+          `| ${cell(seat)} | ${cell(a.choice)} | ${a.confidence === null ? "" : `${a.confidence}%`} | ${cell(a.why)} |`,
+      ),
+      "",
+    ];
+  };
+
   out.push("## Transcript", "");
 
   const headed = new Set<string>();
@@ -145,8 +177,17 @@ export function exportMarkdown(
       out.push(`**Chair** · ${target ? `${where} · replying to ${name(target)}` : where}`, "");
       if (m.content) out.push(quote(m.content), "");
       out.push(...files(m));
+      if (promptOf?.mode === "poll" && promptOf.poll)
+        out.push(...pollTable(promptOf, promptOf.poll));
       continue;
     }
+    // A poll's answers are in its table; only one that failed or couldn't be read is listed on its own.
+    if (
+      round?.mode === "poll" &&
+      m.status === "done" &&
+      parsePollAnswer(m.content, round.poll?.options ?? [])
+    )
+      continue;
 
     if (m.status === "skipped") {
       out.push(`_${name(m)} skipped this turn_`, "");

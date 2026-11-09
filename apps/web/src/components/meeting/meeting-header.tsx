@@ -1,6 +1,14 @@
 "use client";
 
-import { Download, Loader2, MoreHorizontal, NotebookPen, Trash2, Users } from "lucide-react";
+import {
+  ChartBarBig,
+  Download,
+  Loader2,
+  MoreHorizontal,
+  NotebookPen,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMeetings } from "@/components/shell/meetings-context";
@@ -37,7 +45,7 @@ export function MeetingHeader({
   briefShown: boolean;
   onToggleBrief: () => void;
 }) {
-  const { id, state, running, act, openWrapUp } = useRoom();
+  const { id, state, running, act, openWrapUp, openPoll } = useRoom();
   const { refresh } = useMeetings();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -132,6 +140,17 @@ export function MeetingHeader({
           <Download />
           <span className="hidden sm:inline">Export</span>
         </a>
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8"
+        onClick={() => openPoll()}
+        disabled={running || !state.seats.some((s) => !s.removedAt && !s.muted)}
+        title="Ask every seat one question, answered privately in one line"
+      >
+        <ChartBarBig />
+        <span className="hidden sm:inline">Poll</span>
       </Button>
       <Button
         size="sm"

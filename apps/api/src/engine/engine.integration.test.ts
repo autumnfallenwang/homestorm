@@ -538,6 +538,62 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     expect(b?.status).toBe("skipped");
   });
 
+  describe("polls (ADR 0020)", () => {
+    it("asks every unmuted seat at once, privately, for one line, and keeps the poll on the round", async () => {
+      const w = await world();
+      await store.updateSeat(w.ds.id, { muted: true });
+      w.llm.on(w.claude.model, { chunks: ["Choice: Yes · Confidence: 80% · Why: tests pass."] });
+      w.llm.on(w.gpt.model, { chunks: ["Choice: No · Confidence: 60% · Why: one bug left."] });
+      const { message, round } = await w.engine.poll(w.meeting.id, {
+        question: "Ship it this week?",
+        options: ["Yes", "No"],
+      });
+      await w.engine.waitIdle(w.meeting.id);
+
+      expect(message.content).toBe("Ship it this week?\n\nOptions: Yes / No");
+      expect(round).toMatchObject({
+        mode: "poll",
+        poll: { question: "Ship it this week?", options: ["Yes", "No"] },
+      });
+      expect(round.seatIds.sort()).toEqual([w.claude.id, w.gpt.id].sort());
+      const state = await store.getState(w.meeting.id);
+      expect(state?.rounds.at(-1)).toMatchObject({
+        status: "done",
+        poll: { options: ["Yes", "No"] },
+      });
+      const answers = state?.messages.filter((m) => m.roundId === round.id) ?? [];
+      expect(answers.map((m) => m.content).sort()).toEqual([
+        "Choice: No · Confidence: 60% · Why: one bug left.",
+        "Choice: Yes · Confidence: 80% · Why: tests pass.",
+      ]);
+      // Blind: both were cut off at the same point, before either answer.
+      expect(new Set(answers.map((m) => m.cutoffSeq)).size).toBe(1);
+      const floor = String(w.llm.callsFor(w.claude.model)[0]?.messages.at(-1)?.content);
+      expect(floor).toContain("[Floor] The Chair is taking a poll");
+      expect(floor).toContain("Choice: <exactly one of: Yes | No> · Confidence: <0–100>% · Why:");
+      expect(floor).not.toContain("150 to 250 words");
+    });
+
+    it("refuses a poll while a round runs, and with no one to ask", async () => {
+      const w = await world();
+      w.llm.on(w.claude.model, { chunks: ["slow"], delayMs: 50 });
+      await w.engine.send(w.meeting.id, {
+        text: "Q",
+        mode: "blind",
+        targets: [w.claude.id],
+        replyTo: null,
+      });
+      await expect(w.engine.poll(w.meeting.id, { question: "Now?", options: [] })).rejects.toThrow(
+        EngineError,
+      );
+      await w.engine.waitIdle(w.meeting.id);
+      for (const s of [w.claude, w.gpt, w.ds]) await store.updateSeat(s.id, { muted: true });
+      await expect(
+        w.engine.poll(w.meeting.id, { question: "Anyone?", options: [] }),
+      ).rejects.toThrow("No active seats");
+    });
+  });
+
   describe("web tools (ADR 0014)", () => {
     const toolCall = (name: string, args: object, id = `call-${name}`) => ({
       id,
@@ -874,6 +930,17 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       const turns = w.llm.callsFor(w.claude.model);
       expect(turns[0]?.toolChoice).toEqual({ type: "function", function: { name: "web_search" } });
       expect(turns[1]?.toolChoice).toBe("auto");
+    });
+
+    it("no tools in a poll: it asks what a seat thinks now", async () => {
+      const w = await world();
+      await enable(w.gpt, "must");
+      await w.engine.poll(w.meeting.id, { question: "Ship it?", options: ["Yes", "No"] });
+      await w.engine.waitIdle(w.meeting.id);
+      const turn = w.llm.callsFor(w.gpt.model)[0];
+      expect(turn?.tools).toBeUndefined();
+      expect(turn?.toolChoice).toBeUndefined();
+      expect(w.tools.calls).toEqual([]);
     });
 
     it("no tools in a wrap-up: it's a summary of the meeting", async () => {

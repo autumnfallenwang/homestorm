@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import { ATTACHMENT_LIMITS, AttachmentInput, type AttachmentMeta } from "./attachments.js";
+import type { Poll } from "./poll.js";
 
 /** llmgw's `owned_by` values homestorm seats can use (ADR 0002). Ollama is left out on purpose. */
 export const SOURCES = ["anthropic", "openai-codex", "deepseek"] as const;
@@ -13,7 +14,8 @@ export const SEND_MODES = ["blind", "in_turn", "none"] as const;
 export type SendMode = (typeof SEND_MODES)[number];
 
 /** A round records which seats answer and how. `single` is one seat; `wrap_up` writes minutes. */
-export const ROUND_MODES = ["blind", "in_turn", "single", "wrap_up"] as const;
+/** `poll`: every seat answers one question privately, in one line (ADR 0020). */
+export const ROUND_MODES = ["blind", "in_turn", "single", "wrap_up", "poll"] as const;
 export type RoundMode = (typeof ROUND_MODES)[number];
 
 export const ROUND_STATUSES = ["running", "done", "stopped"] as const;
@@ -190,6 +192,8 @@ export interface Round {
   promptMessageId: string | null;
   replyToId: string | null;
   wrapKind: WrapKind | null;
+  /** A poll round's question and options (ADR 0020); null for every other round. */
+  poll: Poll | null;
   status: RoundStatus;
   createdAt: string;
   finishedAt: string | null;

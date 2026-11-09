@@ -524,6 +524,18 @@ describe("renderFloorNote", () => {
     );
   });
 
+  it("asks for a poll's one line, with the options or in a few words of the seat's own", () => {
+    const withOptions = renderFloorNote({ kind: "poll", count: 3, options: ["A", "B"] }, "concise");
+    expect(withOptions).toContain("Everyone answers independently");
+    expect(withOptions).toContain(
+      "Choice: <exactly one of: A | B> · Confidence: <0–100>% · Why: <one short sentence>",
+    );
+    expect(withOptions).not.toContain(CONCISE_REMINDER);
+    const free = renderFloorNote({ kind: "poll", count: 1, options: [] });
+    expect(free).toContain("Choice: <your answer in a few words>");
+    expect(free).not.toContain("Everyone answers independently");
+  });
+
   it("reminds a Concise seat of the length last, but not a Detailed one or a wrap-up", () => {
     expect(renderFloorNote({ kind: "direct" }, "concise")).toBe(
       `[Floor] The Chair asks you to speak now. ${CONCISE_REMINDER}`,

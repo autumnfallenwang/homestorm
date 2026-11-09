@@ -18,6 +18,8 @@ import {
   type MeetingState,
   type Message,
   maxOutputTokens,
+  type Poll,
+  pollPrompt,
   type Round,
   type Seat,
   type SendAction,
@@ -254,6 +256,35 @@ export class Engine {
       wrapKind: input.kind,
       hidden: !input.post,
     });
+  }
+
+  /**
+   * A poll (ADR 0020): the question goes in as the chair's message, then every active seat answers it privately, at
+   * once, in one line. No web tools: it asks what a seat thinks now, after the discussion.
+   */
+  async poll(meetingId: string, input: Poll): Promise<{ message: Message; round: Round }> {
+    const meeting = await this.requireMeeting(meetingId);
+    if (this.isRunning(meetingId)) throw new EngineError(409, RUNNING_ROUND);
+    const seats = (await this.store.activeSeats(meetingId)).filter((s) => !s.muted);
+    if (!seats.length)
+      throw new EngineError(400, "No active seats. Add a seat or unmute one first.");
+    const message = await this.postChair(meeting, {
+      text: pollPrompt(input),
+      sendMode: "blind",
+      targetSeatIds: null,
+      replyToId: null,
+      files: [],
+    });
+    const round = await this.startRound(meeting, {
+      mode: "poll",
+      seats,
+      promptMessageId: message.id,
+      replyToId: null,
+      wrapKind: null,
+      hidden: false,
+      poll: input,
+    });
+    return { message, round };
   }
 
   /** Stop one answer, or everything running in the meeting. Stopped text is kept for the chair to keep or retry. */
@@ -570,6 +601,7 @@ export class Engine {
       replyToId: string | null;
       wrapKind: WrapKind | null;
       hidden: boolean;
+      poll?: Poll;
     },
   ): Promise<Round> {
     const round = await this.store.createRound({
@@ -579,6 +611,7 @@ export class Engine {
       promptMessageId: p.promptMessageId,
       replyToId: p.replyToId,
       wrapKind: p.wrapKind,
+      poll: p.poll ?? null,
     });
     this.emit(meeting.id, { type: "round", round });
 
@@ -652,7 +685,7 @@ export class Engine {
     turns: Message[],
     ctx: ActiveRound,
   ): Promise<void> {
-    if (round.mode === "blind") {
+    if (round.mode === "blind" || round.mode === "poll") {
       const cutoff = (await this.requireMeeting(meetingId)).clock;
       await Promise.all(
         turns.map(async (m) =>
@@ -680,7 +713,8 @@ export class Engine {
     web: WebAccess,
     floor: Floor,
   ): Promise<ToolDefinition[] | null> {
-    if (!this.tools || web === "off" || floor.kind === "wrap_up") return null;
+    if (!this.tools || web === "off" || floor.kind === "wrap_up" || floor.kind === "poll")
+      return null;
     try {
       return await this.tools.list();
     } catch (err) {
@@ -756,6 +790,8 @@ export class Engine {
     switch (round.mode) {
       case "wrap_up":
         return { kind: "wrap_up", wrapKind: (round.wrapKind ?? "minutes") as WrapKind };
+      case "poll":
+        return { kind: "poll", count, options: round.poll?.options ?? [] };
       case "blind":
         return { kind: "blind", count, replyTo };
       case "in_turn":

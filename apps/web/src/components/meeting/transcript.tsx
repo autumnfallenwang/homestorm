@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { AttachmentStrip, shownSaved } from "./attachments";
 import { useCurrentBrief } from "./brief";
 import { Markdown } from "./markdown";
+import { PollResults } from "./poll-results";
 import { useRoom } from "./room-context";
 import { SeatAvatar, SourceTag } from "./source";
 
@@ -45,8 +46,9 @@ export function transcriptItems(messages: Message[], rounds: Round[]): Item[] {
     if (
       m.authorKind === "seat" &&
       round &&
-      (round.mode === "blind" || round.mode === "in_turn") &&
-      round.seatIds.length > 1
+      (((round.mode === "blind" || round.mode === "in_turn") && round.seatIds.length > 1) ||
+        // A poll is a table even with one seat (ADR 0020).
+        round.mode === "poll")
     ) {
       if (boxed.has(round.id)) continue;
       boxed.add(round.id);
@@ -107,6 +109,15 @@ const ROUND_NOTE: Record<"blind" | "in_turn", string> = {
 };
 
 function RoundBox({ round, messages }: { round: Round; messages: Message[] }) {
+  if (round.mode === "poll") {
+    return (
+      <PollResults
+        round={round}
+        messages={messages}
+        renderMessage={(m) => <MessageItem message={m} inRound />}
+      />
+    );
+  }
   const mode = round.mode === "in_turn" ? "in_turn" : "blind";
   return (
     <section

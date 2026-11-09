@@ -340,6 +340,40 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(md).not.toContain("$0.0668");
   });
 
+  it("takes a poll, and exports it as a tally and a table (ADR 0020)", async () => {
+    const { call, engine, llm } = setup();
+    llm.on("claude-opus-5-5", {
+      chunks: ["**Choice:** Yes · **Confidence:** 80% · **Why:** tests pass."],
+    });
+    llm.on("gpt-6-luna", { chunks: ["I won't pick."] });
+    const id = (await call("POST", "/api/meetings", { title: "Poll" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "claude-opus-5-5" });
+    await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" });
+
+    expect((await call("POST", `/api/meetings/${id}/poll`, { question: " " })).status).toBe(400);
+    expect(
+      (await call("POST", `/api/meetings/${id}/poll`, { question: "Q", options: ["A", "a"] }))
+        .status,
+    ).toBe(400);
+    const res = await call("POST", `/api/meetings/${id}/poll`, {
+      question: "Ship it?",
+      options: ["Yes", "No"],
+    });
+    expect(res.status).toBe(202);
+    expect(res.body.round).toMatchObject({ mode: "poll", poll: { question: "Ship it?" } });
+    await engine.waitIdle(id);
+
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("### Round 1 · Poll");
+    expect(md).toContain("> Ship it?\n>\n> Options: Yes / No");
+    expect(md).toContain("**Tally:** Yes 1");
+    expect(md).toContain("| Claude Opus 5.5 | Yes | 80% | tests pass. |");
+    // An answer that couldn't be read is listed as it came, not lost.
+    expect(md).toContain("**GPT-6 Luna**");
+    expect(md).toContain("I won't pick.");
+    expect(md).not.toContain("**Claude Opus 5.5** ·");
+  });
+
   it("records room-rule changes, and posts a wrap-up only when the chair says so", async () => {
     const { call, engine, llm } = setup();
     llm.on("claude-opus-5-5", { chunks: ["Answer."] }, { chunks: ["DECISION: B"] });

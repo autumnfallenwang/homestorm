@@ -1,6 +1,6 @@
 "use client";
 
-import { briefAt, type Message, type Seat } from "@homestorm/shared";
+import { briefAt, type Message, type Poll, type Seat } from "@homestorm/shared";
 import { Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -12,6 +12,7 @@ import { BriefDialog, BriefPanel } from "./brief";
 import { Composer } from "./composer";
 import { EditSeatDialog } from "./edit-seat-dialog";
 import { MeetingHeader } from "./meeting-header";
+import { PollDialog } from "./poll-dialog";
 import { ReplyDialog } from "./reply-dialog";
 import { type Room, RoomContext } from "./room-context";
 import { SeatsPanel, SeatsRail } from "./seats-panel";
@@ -26,6 +27,7 @@ export function MeetingRoom({ id }: { id: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [wrapOpen, setWrapOpen] = useState(false);
+  const [pollDraft, setPollDraft] = useState<Poll | null>(null);
   const [editSeat, setEditSeat] = useState<Seat | null>(null);
   const [briefDraft, setBriefDraft] = useState<string | null>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
@@ -94,6 +96,7 @@ export function MeetingRoom({ id }: { id: string }) {
       act,
       openReply: setReplyTarget,
       openWrapUp: () => setWrapOpen(true),
+      openPoll: (start?: Poll) => setPollDraft(start ?? { question: "", options: [] }),
       openBrief: (draft?: string) =>
         setBriefDraft(draft ?? briefAt(state.messages, state.meeting.clock)),
       openEditSeat: setEditSeat,
@@ -191,6 +194,7 @@ export function MeetingRoom({ id }: { id: string }) {
       )}
       <ReplyDialog target={replyTarget} onClose={() => setReplyTarget(null)} />
       <WrapUpDialog open={wrapOpen} onClose={() => setWrapOpen(false)} />
+      <PollDialog draft={pollDraft} onClose={() => setPollDraft(null)} />
       <EditSeatDialog seat={editSeat} onClose={() => setEditSeat(null)} />
       <BriefDialog draft={briefDraft} onClose={() => setBriefDraft(null)} />
     </RoomContext.Provider>

@@ -29,6 +29,7 @@ import {
   type Limits,
   type MeetingEvent,
   MoveSeatInput,
+  PollInput,
   prettyModelName,
   SendActionInput,
   SetBriefInput,
@@ -422,6 +423,17 @@ export function meetingRoutes(deps: MeetingDeps) {
     if (input instanceof Response) return input;
     try {
       return c.json(await engine.send(c.req.param("id"), input), 202);
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  // A poll (ADR 0020): the question to every active seat, answered privately in one line each.
+  app.post("/meetings/:id/poll", async (c) => {
+    const input = await parse(c, PollInput);
+    if (input instanceof Response) return input;
+    try {
+      return c.json(await engine.poll(c.req.param("id"), input), 202);
     } catch (err) {
       return fail(c, err);
     }
