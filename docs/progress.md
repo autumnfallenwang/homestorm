@@ -17,6 +17,8 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **CI's arch-infra bump** takes `ARCH_INFRA_DEPLOY_KEY` (a deploy key that can push to arch-infra only) or
     `ARCH_INFRA_TOKEN`. Neither is set yet: making the key and storing it as a secret is for the user (commands in
     the README under Deploy); auto mode doesn't write secrets.
+  - **Deployed as `253b120`** (arch-infra `372f195`, tags by hand): Argo CD shows homestorm Synced and Healthy for the
+    first time since 2026-11-03, with the database pod untouched (no restart); the Profile page's console is clean.
 
 - **Fixes from the full meeting test** (below):
   - **`~` isn't strikethrough any more.** Only `~~double~~` is (`singleTilde: false` in `markdown.tsx`), so "~$350
