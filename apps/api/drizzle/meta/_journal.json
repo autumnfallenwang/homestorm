@@ -64,6 +64,13 @@
       "when": 1794199782970,
       "tag": "0008_poll_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794201489855,
+      "tag": "0009_effort_off",
+      "breakpoints": true
     }
   ]
 }

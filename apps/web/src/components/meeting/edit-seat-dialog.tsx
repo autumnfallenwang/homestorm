@@ -125,6 +125,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="off">Off (fastest: no thinking)</SelectItem>
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="high">High</SelectItem>

@@ -53,8 +53,11 @@ export type AuthorKind = (typeof AUTHOR_KINDS)[number];
 export const ANSWER_LENGTHS = ["concise", "detailed"] as const;
 export type AnswerLength = (typeof ANSWER_LENGTHS)[number];
 
-/** Per-seat thinking effort (ADR 0012). llmgw accepts more levels; the UI offers these three. */
-export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+/**
+ * Per-seat thinking effort (ADR 0012). `off` (2026-11-09) sends llmgw "none": DeepSeek and Claude stop thinking, and a
+ * model that always thinks gets its lowest level. DeepSeek V4 Pro thought for a median 56 s at Low on the cluster.
+ */
+export const REASONING_EFFORTS = ["off", "low", "medium", "high"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 /** How much of the meeting a seat's view may hold (ADR 0012); see contextBudgetTokens in budget.ts. */

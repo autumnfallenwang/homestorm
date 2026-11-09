@@ -5,7 +5,14 @@
 // The stream gives text, reasoning and tool-call deltas, then a usage chunk (ADR 0009). Since llmgw 0.8.0 that chunk
 // carries `cost_usd`, and the `X-Request-Id` response header is llmgw's own `req_id`; both are read when present.
 
-import type { ErrorCode, LimitStatus, Limits, ModelInfo, Source } from "@homestorm/shared";
+import type {
+  ErrorCode,
+  LimitStatus,
+  Limits,
+  ModelInfo,
+  ReasoningEffort,
+  Source,
+} from "@homestorm/shared";
 import { SOURCES } from "@homestorm/shared";
 import OpenAI, { APIError } from "openai";
 import { log } from "../lib/logger.js";
@@ -45,7 +52,8 @@ export interface ChatTurn {
   model: string;
   messages: ChatTurnMessage[];
   maxTokens?: number;
-  reasoningEffort?: "low" | "medium" | "high";
+  /** `off` goes to llmgw as "none" (it moves that to the lowest level a model has, if it can't stop thinking). */
+  reasoningEffort?: ReasoningEffort;
   tools?: ToolDefinition[];
   /**
    * `auto`, or one tool by name. Not "required": Anthropic won't force a tool while a model thinks unless it's named,
@@ -134,7 +142,12 @@ export function createLlmgwClient(baseUrl: string): LlmClient {
               stream: true,
               stream_options: { include_usage: true },
               ...(turn.maxTokens ? { max_tokens: turn.maxTokens } : {}),
-              ...(turn.reasoningEffort ? { reasoning_effort: turn.reasoningEffort } : {}),
+              ...(turn.reasoningEffort
+                ? {
+                    reasoning_effort:
+                      turn.reasoningEffort === "off" ? "none" : turn.reasoningEffort,
+                  }
+                : {}),
               ...(turn.tools?.length
                 ? { tools: turn.tools, tool_choice: turn.toolChoice ?? "auto" }
                 : {}),

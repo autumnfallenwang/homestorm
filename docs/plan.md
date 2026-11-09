@@ -216,5 +216,5 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
    ([ADR 0019](adr/0019-pdf-and-word-files-read-in-the-browser.md))
 2. **Tuning from real meetings,** with mcpgw's M10: drafts and release candidates in the web guidance, and whether
    seats still use all 6 calls. *First pass 2026-11-09 (progress.md): the budget and calls left told to seats, drafts
-   and previews in the guidance; DeepSeek V4 Pro's thinking time left for the user to decide.*
+   and previews in the guidance; DeepSeek V4 Pro's thinking time: a thinking effort of Off, on the user's go.*
 3. ~~**One meeting feature from "Later": a poll**~~: done 2026-11-08 ([ADR 0020](adr/0020-polls.md))

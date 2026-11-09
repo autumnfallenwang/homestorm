@@ -342,6 +342,23 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     expect(m.error?.message).toContain("output limit (10,240 tokens)");
   });
 
+  it("sends effort Off with only a little thinking room", async () => {
+    const w = await world();
+    await store.updateSeat(w.ds.id, { reasoningEffort: "off" });
+    await w.engine.send(w.meeting.id, {
+      text: "Q",
+      mode: "blind",
+      targets: [w.ds.id],
+      replyTo: null,
+    });
+    await w.engine.waitIdle(w.meeting.id);
+    const turn = w.llm.callsFor(w.ds.model)[0];
+    expect(turn?.reasoningEffort).toBe("off");
+    expect(turn?.maxTokens).toBe(4_096); // 2,048 for a Concise answer + 2,048
+    const msg = (await seatMessages(w.meeting.id)).at(-1);
+    expect(msg?.reasoningEffort).toBe("off");
+  });
+
   it("gives thinking room on top of the answer cap, within the model's limit", async () => {
     const w = await world();
     await store.updateSeat(w.claude.id, { reasoningEffort: "high" });

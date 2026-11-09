@@ -8,6 +8,8 @@ describe("maxOutputTokens", () => {
     expect(maxOutputTokens("concise", "high", null)).toBe(34_816);
     expect(maxOutputTokens("detailed", "low", null)).toBe(16_384);
     expect(maxOutputTokens("detailed", "high", null)).toBe(40_960);
+    // Off keeps a little, for a model that can't stop thinking.
+    expect(maxOutputTokens("concise", "off", null)).toBe(4_096);
   });
 
   it("never asks for more than the model allows", () => {

@@ -70,13 +70,17 @@ room. Put length in this setting, not in a persona: a persona is free text and t
 shows the override ("Detailed answers"), and setting or clearing it adds an event line.
 
 **Thinking effort is per seat:** `reasoning_effort` of `low` (default), `medium` or `high`, picked in the seat's
-settings.
+settings, or **Off** (added 2026-11-09), which sends `none`: DeepSeek and Claude don't think at all, and a model that
+always thinks gets its lowest level from llmgw. Checked through llmgw: DeepSeek V4 Pro wrote 54 output tokens with
+`none` against 308 with `low` for the same one-sentence answer. On the cluster it had thought for a median 56 s per
+answer at Low, where the other models took 11 to 33 s.
 
 **`max_tokens` is the answer room plus thinking room** (changed 2026-11-03), and never more than the model's own
 `max_tokens` from `/v1/models`:
 
 | Thinking effort | Thinking room | Concise | Detailed |
 |---|---|---|---|
+| Off | 2,048 | 4,096 | 10,240 |
 | Low | 8,192 | 10,240 | 16,384 |
 | Medium | 16,384 | 18,432 | 24,576 |
 | High | 32,768 | 34,816 | 40,960 |

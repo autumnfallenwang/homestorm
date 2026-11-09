@@ -1,0 +1,2 @@
+ALTER TABLE "seats" DROP CONSTRAINT "seats_reasoning_effort_valid";--> statement-breakpoint
+ALTER TABLE "seats" ADD CONSTRAINT "seats_reasoning_effort_valid" CHECK ("seats"."reasoning_effort" IN ('off', 'low', 'medium', 'high'));

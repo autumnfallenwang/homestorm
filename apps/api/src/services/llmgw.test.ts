@@ -77,6 +77,23 @@ describe("stream, with tools", () => {
     });
   });
 
+  it("sends effort Off as reasoning_effort none, and other efforts as they are", async () => {
+    const llmgw = await serve([delta({ content: "Hi." }, "stop")]);
+    const client = createLlmgwClient(llmgw.url);
+    for (const reasoningEffort of ["off", "low", "high"] as const) {
+      for await (const _ of client.stream({
+        model: "deepseek-v4-pro",
+        messages: [{ role: "user", content: "q" }],
+        requestId: "r",
+        reasoningEffort,
+      })) {
+        // drain
+      }
+    }
+    llmgw.close();
+    expect(llmgw.sent.map((b) => b.reasoning_effort)).toEqual(["none", "low", "high"]);
+  });
+
   it("reports no tool calls on a plain answer", async () => {
     const llmgw = await serve([delta({ content: "Hi" }), delta({}, "stop")]);
     const events = [];

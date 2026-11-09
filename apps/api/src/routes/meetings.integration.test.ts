@@ -435,6 +435,26 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(gptView).toContain("[Claude Opus 5.5, decision]: DECISION: B");
   });
 
+  it("takes thinking effort Off when adding a seat and when changing one", async () => {
+    const { call } = setup();
+    const id = (await call("POST", "/api/meetings", { title: "Effort" })).body.id as string;
+    const seat = (
+      await call("POST", `/api/meetings/${id}/seats`, {
+        model: "deepseek-v4-pro",
+        reasoningEffort: "off",
+      })
+    ).body as Seat;
+    expect(seat.reasoningEffort).toBe("off");
+    const patched = await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, {
+      reasoningEffort: "low",
+    });
+    expect(patched.body.reasoningEffort).toBe("low");
+    expect(
+      (await call("PATCH", `/api/meetings/${id}/seats/${seat.id}`, { reasoningEffort: "none" }))
+        .status,
+    ).toBe(400);
+  });
+
   it("lets a seat have its own answer length, and records each change", async () => {
     const { call } = setup();
     const id = (await call("POST", "/api/meetings", { title: "Lengths" })).body.id as string;

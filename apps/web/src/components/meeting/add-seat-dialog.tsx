@@ -287,6 +287,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="off">Off (fastest: no thinking)</SelectItem>
                   <SelectItem value="low">Low (fast, the default)</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High (slow, spends more allowance)</SelectItem>

@@ -7,9 +7,10 @@ export const ANSWER_CAP = { concise: 2_048, detailed: 8_192 } as const;
 
 /**
  * Extra room for thinking, per thinking effort. Reasoning models count thinking inside `max_tokens`, and how long
- * they think varies a lot: DeepSeek V4 Pro spent over 2,048 tokens thinking on a short question.
+ * they think varies a lot: DeepSeek V4 Pro spent over 2,048 tokens thinking on a short question. Off keeps a little,
+ * for a model that can't stop thinking and gets its lowest level instead.
  */
-export const THINKING_ROOM = { low: 8_192, medium: 16_384, high: 32_768 } as const;
+export const THINKING_ROOM = { off: 2_048, low: 8_192, medium: 16_384, high: 32_768 } as const;
 
 /** Room left for the reply's estimation error, on top of the output cap. */
 export const BUDGET_MARGIN_TOKENS = 4_000;

@@ -412,7 +412,8 @@ function MetaLine({ message }: { message: Message }) {
   // Only money actually paid: llmgw's figure for a subscription is a list-price equivalent.
   const spend = spendUsd(message);
   if (spend !== null) parts.push(`$${spend.toFixed(4)}`);
-  if (message.reasoningEffort && message.reasoningEffort !== "low")
+  if (message.reasoningEffort === "off") parts.push("thinking off");
+  else if (message.reasoningEffort && message.reasoningEffort !== "low")
     parts.push(`effort ${message.reasoningEffort}`);
   return (
     <p className="mt-1.5 font-mono text-[0.6875rem] text-muted-foreground">

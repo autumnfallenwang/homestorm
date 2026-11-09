@@ -126,7 +126,10 @@ export const seats = pgTable(
   (t) => [
     index("seats_meeting_idx").on(t.meetingId, t.position),
     check("seats_owned_by_valid", sql`${t.ownedBy} IN ('anthropic', 'openai-codex', 'deepseek')`),
-    check("seats_reasoning_effort_valid", sql`${t.reasoningEffort} IN ('low', 'medium', 'high')`),
+    check(
+      "seats_reasoning_effort_valid",
+      sql`${t.reasoningEffort} IN ('off', 'low', 'medium', 'high')`,
+    ),
     check("seats_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`),
     check(
       "seats_context_budget_valid",

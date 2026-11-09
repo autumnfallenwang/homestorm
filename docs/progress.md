@@ -6,6 +6,13 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-09
 
+- **Thinking effort Off** ([ADR 0012](adr/0012-long-meetings-answer-length-effort.md)), on the user's go after the
+  tuning pass below. A fourth setting in the seat dialogs, "Off (fastest: no thinking)"; it sends llmgw
+  `reasoning_effort: "none"`, with 2,048 tokens of thinking room in case a model can't stop. Checked through llmgw
+  first: DeepSeek V4 Pro 54 output tokens with `none` against 308 with `low`; Claude Haiku and GPT-6 Luna take `none`
+  too. Migration 0009 widens `seats.reasoning_effort`. The seat card and the answer line say "thinking off". Low stays
+  the default.
+
 - **Tuning from real meetings, first pass.** All 73 seat turns on the cluster (6 meetings, no errors):
   - **Web calls:** 12 of the 26 turns with web tools used all 6 calls: 4 of 6 for Claude Haiku 5.5, 5 of 8 for
     DeepSeek Flash, 3 of 6 for GPT-5.6 Luna; GPT-6 Luna averaged 3 even on "must search". Nothing told seats the budget.
