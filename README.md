@@ -50,18 +50,9 @@ Argo CD Application in `arch-infra` (`apps/homestorm.yaml`; review copy in `depl
 
 - **Web:** http://homestorm.arch.internal. **API:** http://homestorm-api.arch.internal (Traefik on 192.168.1.163).
 - **CI** (`.github/workflows/build.yml`): fast tests, then both images tagged with the commit SHA, then the image tags
-  bumped in arch-infra. The bump needs one repo secret: `ARCH_INFRA_DEPLOY_KEY` (preferred: the private half of a
-  deploy key with write access on arch-infra, and on nothing else) or `ARCH_INFRA_TOKEN` (a token that can push to
-  arch-infra, as the other home apps use). Without either, the job skips with a warning and tags are bumped by hand.
-  Setting up the deploy key, once, from this repo:
-
-  ```sh
-  ssh-keygen -t ed25519 -N "" -C "homestorm CI: bump image tags in arch-infra" -f /tmp/arch-infra-deploy
-  gh repo deploy-key add /tmp/arch-infra-deploy.pub --repo autumnfallenwang/arch-infra --allow-write \
-    --title "homestorm CI: bump image tags"
-  gh secret set ARCH_INFRA_DEPLOY_KEY --repo autumnfallenwang/homestorm < /tmp/arch-infra-deploy
-  shred -u /tmp/arch-infra-deploy && rm /tmp/arch-infra-deploy.pub
-  ```
+  bumped in arch-infra. The bump uses the `ARCH_INFRA_TOKEN` repo secret, the same token the other home apps use (a
+  fine-grained token that can push to arch-infra). The workflow also takes an `ARCH_INFRA_DEPLOY_KEY` (a deploy key on
+  arch-infra) instead. Without either, the job skips with a warning and tags are bumped by hand.
 - **Secrets** (`homestorm-secrets`: `DATABASE_URL`, `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`) are created
   out-of-band: `HOMESTORM_SECRET_ENV=private/cluster-secrets.env bash scripts/create-cluster-secret.sh`. The file is
   gitignored; the template is `deploy/cluster-secrets.env.example`.

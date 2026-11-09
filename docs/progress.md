@@ -6,6 +6,10 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **CI's arch-infra token, like the other apps:** homestorm's `ARCH_INFRA_TOKEN` is now the same fine-grained token
+  llm-gateway, homework and homecal use. The deploy key from earlier today was removed from arch-infra, and its secret
+  from homestorm. The workflow still takes either.
+
 - **Attachments phase 2: PDF and Word files** ([ADR 0019](adr/0019-pdf-and-word-files-read-in-the-browser.md)). The
   browser reads them into text in a Web Worker (one per file, 20 MB and 20 seconds at most) and attaches the text, so
   the server never parses either format; the API didn't change. `unpdf` 1.9.1 for PDFs (each page marked "[Page N]")
