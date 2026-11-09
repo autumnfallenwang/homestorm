@@ -129,11 +129,21 @@ export function meetingRoutes(deps: MeetingDeps) {
   // ── Meetings ──────────────────────────────────────────────────────────────
   app.get("/meetings", async (c) => c.json(await store.listMeetings()));
 
-  app.post("/meetings", async (c) => {
+  app.post("/meetings", uploadLimit, async (c) => {
     const input = await parse(c, CreateMeetingInput);
     if (input instanceof Response) return input;
     const meeting = await store.createMeeting(input.title);
-    if (input.brief?.trim()) await engine.setBrief(meeting.id, input.brief);
+    if (input.brief?.trim() || input.briefAttachments.length) {
+      try {
+        await engine.setBrief(meeting.id, input.brief ?? "", {
+          attachments: input.briefAttachments,
+        });
+      } catch (err) {
+        // Files the brief can't take: no half-made meeting left behind, and the chair sees why.
+        await store.deleteMeeting(meeting.id);
+        return fail(c, err);
+      }
+    }
     return c.json((await store.getMeeting(meeting.id)) ?? meeting, 201);
   });
 

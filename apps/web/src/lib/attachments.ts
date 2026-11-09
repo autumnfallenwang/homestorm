@@ -137,3 +137,26 @@ export function filesFrom(data: DataTransfer | null): File[] {
   if (!data) return [];
   return Array.from(data.files ?? []);
 }
+
+/**
+ * Why a brief's files can't be saved, or null (ADR 0016): at most 8 files, 4 images, and 24,000 characters of text
+ * files, since every seat gets them on every turn. The API checks the same; this says so before sending.
+ */
+export function briefFilesProblem(
+  files: ReadonlyArray<{ kind: "image" | "text"; textChars: number }>,
+): string | null {
+  const images = files.filter((f) => f.kind === "image").length;
+  const chars = files.reduce((n, f) => n + (f.kind === "text" ? f.textChars : 0), 0);
+  if (files.length > ATTACHMENT_LIMITS.perMessage)
+    return `At most ${ATTACHMENT_LIMITS.perMessage} files in the brief.`;
+  if (images > ATTACHMENT_LIMITS.briefImages)
+    return `At most ${ATTACHMENT_LIMITS.briefImages} images in the brief.`;
+  if (chars > ATTACHMENT_LIMITS.briefTextFileChars)
+    return `Text files in the brief can add up to ${ATTACHMENT_LIMITS.briefTextFileChars.toLocaleString("en-US")} characters: every seat gets them on every turn.`;
+  return null;
+}
+
+/** A waiting file as `briefFilesProblem` counts it. */
+export function pendingForBrief(f: PendingFile): { kind: "image" | "text"; textChars: number } {
+  return { kind: f.kind, textChars: f.kind === "text" ? f.text.length : 0 };
+}

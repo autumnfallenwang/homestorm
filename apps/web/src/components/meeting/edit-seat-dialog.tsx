@@ -119,9 +119,9 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Thinking effort</Label>
+            <Label htmlFor="edit-effort">Thinking effort</Label>
             <Select value={effort} onValueChange={(v) => setEffort(v as ReasoningEffort)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="edit-effort" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -135,6 +135,18 @@ const STATUS_TONE: Record<string, string> = {
   Unavailable: "text-destructive",
 };
 
+/** A seat's own settings, where it differs from the defaults and the room rules: "effort high · no web tools". */
+function ownSettings(seat: Seat): string[] {
+  return [
+    seat.reasoningEffort !== "low" ? `effort ${seat.reasoningEffort}` : "",
+    seat.answerLength ? `${LENGTH_LABEL[seat.answerLength]} answers` : "",
+    seat.contextBudget && seat.contextBudget !== "standard"
+      ? `${BUDGET_LABEL[seat.contextBudget]} context`
+      : "",
+    seat.webAccess ? WEB_CARD_LABEL[seat.webAccess] : "",
+  ].filter(Boolean);
+}
+
 function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boolean }) {
   const { id, state, limits, running, act, openEditSeat } = useRoom();
   const context = useContextLine(seat);
@@ -157,15 +169,14 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
         <SeatAvatar name={seat.displayName} source={seat.ownedBy} dashed={seat.muted} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{seat.displayName}</p>
-          <p className="truncate font-mono text-[0.6875rem] text-muted-foreground">
-            {seat.model}
-            {seat.reasoningEffort !== "low" && ` · effort ${seat.reasoningEffort}`}
-            {seat.answerLength && ` · ${LENGTH_LABEL[seat.answerLength]} answers`}
-            {seat.contextBudget &&
-              seat.contextBudget !== "standard" &&
-              ` · ${BUDGET_LABEL[seat.contextBudget]} context`}
-            {seat.webAccess && ` · ${WEB_CARD_LABEL[seat.webAccess]}`}
-          </p>
+          <p className="truncate font-mono text-[0.6875rem] text-muted-foreground">{seat.model}</p>
+          {/* The seat's own settings on a line of their own that wraps: on one line with the model they were cut
+              off ("deepseek-v4-pro · no web too…"). */}
+          {ownSettings(seat).length > 0 && (
+            <p className="text-[0.6875rem] text-muted-foreground">
+              {ownSettings(seat).join(" · ")}
+            </p>
+          )}
         </div>
         <span className={cn("shrink-0 text-xs font-medium", STATUS_TONE[status])}>{status}</span>
       </div>

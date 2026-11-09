@@ -628,6 +628,40 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     );
   });
 
+  it("takes the brief's files at creation, as one version, and leaves no meeting when it refuses them", async () => {
+    const { call } = setup();
+    const created = await call("POST", "/api/meetings", {
+      title: "Briefed with files",
+      brief: "Drive inventory and growth chart attached.",
+      briefAttachments: [
+        dotPng,
+        { kind: "text", name: "nas-inventory.csv", text: "bay,model\n1,WD80EFZZ" },
+      ],
+    });
+    expect(created.status).toBe(201);
+    const state = (await call("GET", `/api/meetings/${created.body.id}`)).body as MeetingState;
+    const briefs = state.messages.filter((m) => m.authorKind === "brief");
+    // One version with its files, not "set" and then "updated (2 files)".
+    expect(briefs).toHaveLength(1);
+    expect(briefs[0]?.attachments.map((f) => f.name)).toEqual(["dot.png", "nas-inventory.csv"]);
+
+    // A file-only brief works too.
+    const filesOnly = await call("POST", "/api/meetings", {
+      title: "Chart only",
+      briefAttachments: [dotPng],
+    });
+    expect(filesOnly.status).toBe(201);
+
+    const before = ((await call("GET", "/api/meetings")).body as MeetingSummary[]).length;
+    const tooMany = await call("POST", "/api/meetings", {
+      title: "Too many images",
+      briefAttachments: Array.from({ length: 5 }, (_, i) => ({ ...dotPng, name: `dot${i}.png` })),
+    });
+    expect(tooMany.status).toBe(400);
+    expect(tooMany.body.error).toMatch(/images/);
+    expect((await call("GET", "/api/meetings")).body).toHaveLength(before);
+  });
+
   it("keeps the brief's files across edits, puts them in every view, and caps them", async () => {
     const { call, engine, llm } = setup();
     const id = (await call("POST", "/api/meetings", { title: "Brief files" })).body.id as string;

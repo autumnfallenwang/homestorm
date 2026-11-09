@@ -68,8 +68,12 @@ export interface ModelsResponse {
 
 export const api = {
   listMeetings: () => request<MeetingSummary[]>("GET", "/api/meetings"),
-  createMeeting: (title: string, brief?: string) =>
-    request<Meeting>("POST", "/api/meetings", { title, ...(brief?.trim() ? { brief } : {}) }),
+  createMeeting: (title: string, brief?: string, briefAttachments: AttachmentInput[] = []) =>
+    request<Meeting>("POST", "/api/meetings", {
+      title,
+      ...(brief?.trim() ? { brief } : {}),
+      ...(briefAttachments.length ? { briefAttachments } : {}),
+    }),
   setBrief: (
     id: string,
     content: string,

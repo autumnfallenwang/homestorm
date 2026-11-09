@@ -6,6 +6,15 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Three small fixes:**
+  - **Files at creation:** the New meeting dialog takes the brief's images and text files (paperclip, paste or drop),
+    and `POST /api/meetings` saves them with the text as one brief version (`briefAttachments`). Files the brief can't
+    take get a 400 and leave no meeting behind. The brief editor and this dialog share one limit check.
+  - **Named dropdowns:** thinking effort, answer length, context budget and web tools in the seat dialogs are tied
+    to their labels, so a screen reader names them.
+  - **Seat card:** the seat's own settings sit on their own wrapping line under the model, instead of being cut off
+    ("deepseek-v4-pro · no web too…").
+
 - **Three loose ends:**
   - **Argo CD OutOfSync, found:** the database StatefulSet's claim template left out `apiVersion`, `kind` and
     `volumeMode`, which Kubernetes fills in, so Argo's diff never matched. Loki's live template looks the same but its

@@ -1,6 +1,7 @@
 "use client";
 
 import { ANSWER_LENGTH_LABEL, type AnswerLength } from "@homestorm/shared";
+import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -25,14 +26,16 @@ export function AnswerLengthSelect({
   onChange: (v: AnswerLength | null) => void;
   roomRule: AnswerLength;
 }) {
+  // Names the dropdown for screen readers: a Label alone isn't tied to Radix's trigger button.
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label>Answer length</Label>
+      <Label htmlFor={id}>Answer length</Label>
       <Select
         value={value ?? "room"}
         onValueChange={(v) => onChange(v === "room" ? null : (v as AnswerLength))}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger id={id} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

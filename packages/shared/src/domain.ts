@@ -271,8 +271,10 @@ export const CreateMeetingInput = z.object({
   title: z.string().trim().min(1).max(200),
   /** Optional standing context every seat always sees. */
   brief: z.string().max(BRIEF_MAX_CHARS).optional(),
+  /** Images and text files for the brief (ADR 0016), saved with its text as one version. */
+  briefAttachments: z.array(AttachmentInput).max(ATTACHMENT_LIMITS.perMessage).default([]),
 });
-export type CreateMeetingInput = z.infer<typeof CreateMeetingInput>;
+export type CreateMeetingInput = z.input<typeof CreateMeetingInput>;
 
 export const UpdateMeetingInput = z
   .object({

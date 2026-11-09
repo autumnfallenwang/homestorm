@@ -1,6 +1,7 @@
 "use client";
 
 import { CONTEXT_BUDGETS, type ContextBudget, contextBudgetTokens } from "@homestorm/shared";
+import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -47,14 +48,16 @@ export function ContextBudgetSelect({
   const size = (p: ContextBudget) =>
     standard === null ? null : contextBudgetTokens(p, contextWindow, outputCap, standard);
   const chosen = size(preset);
+  // Names the dropdown for screen readers: a Label alone isn't tied to Radix's trigger button.
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label>Context budget</Label>
+      <Label htmlFor={id}>Context budget</Label>
       <Select
         value={preset}
         onValueChange={(v) => onChange(v === "standard" ? null : (v as ContextBudget))}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger id={id} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

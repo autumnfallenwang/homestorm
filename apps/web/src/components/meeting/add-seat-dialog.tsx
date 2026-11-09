@@ -281,9 +281,9 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Thinking effort</Label>
+              <Label htmlFor="seat-effort">Thinking effort</Label>
               <Select value={effort} onValueChange={(v) => setEffort(v as ReasoningEffort)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="seat-effort" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

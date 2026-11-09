@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { filesFrom, type PendingFile, readFiles, toAttachmentInputs } from "@/lib/attachments";
+import {
+  briefFilesProblem,
+  filesFrom,
+  type PendingFile,
+  pendingForBrief,
+  readFiles,
+  toAttachmentInputs,
+} from "@/lib/attachments";
 import { cn } from "@/lib/utils";
 import { AttachButton, AttachmentStrip, shownPending, shownSaved } from "./attachments";
 import { useRoom } from "./room-context";
@@ -150,19 +157,10 @@ export function BriefDialog({ draft, onClose }: { draft: string | null; onClose:
   }, [draft]);
 
   const kept = currentFiles.filter((f) => keep.includes(f.id));
-  const images =
-    kept.filter((f) => f.kind === "image").length + added.filter((f) => f.kind === "image").length;
-  const fileChars =
-    kept.reduce((n, f) => n + (f.textChars ?? 0), 0) +
-    added.reduce((n, f) => n + (f.kind === "text" ? f.text.length : 0), 0);
-  const tooMany = kept.length + added.length > ATTACHMENT_LIMITS.perMessage;
-  const fileProblem = tooMany
-    ? `At most ${ATTACHMENT_LIMITS.perMessage} files in the brief.`
-    : images > ATTACHMENT_LIMITS.briefImages
-      ? `At most ${ATTACHMENT_LIMITS.briefImages} images in the brief.`
-      : fileChars > ATTACHMENT_LIMITS.briefTextFileChars
-        ? `Text files in the brief can add up to ${ATTACHMENT_LIMITS.briefTextFileChars.toLocaleString("en-US")} characters: every seat gets them on every turn.`
-        : null;
+  const fileProblem = briefFilesProblem([
+    ...kept.map((f) => ({ kind: f.kind, textChars: f.textChars ?? 0 })),
+    ...added.map(pendingForBrief),
+  ]);
   const over = text.length > BRIEF_MAX_CHARS;
   const sameFiles = !added.length && kept.length === currentFiles.length;
   const unchanged = text.trim() === current && sameFiles;

@@ -1,6 +1,7 @@
 "use client";
 
 import { WEB_ACCESS_LABEL, type WebAccess } from "@homestorm/shared";
+import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -33,14 +34,16 @@ export function WebAccessSelect({
   onChange: (v: WebAccess | null) => void;
   roomRule: WebAccess;
 }) {
+  // Names the dropdown for screen readers: a Label alone isn't tied to Radix's trigger button.
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <Label>Web tools</Label>
+      <Label htmlFor={id}>Web tools</Label>
       <Select
         value={value ?? "room"}
         onValueChange={(v) => onChange(v === "room" ? null : (v as WebAccess))}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger id={id} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
