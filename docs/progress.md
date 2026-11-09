@@ -17,6 +17,12 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     itself in a worker, sets itself up as a pdf.js worker on `self` and posts a "ready" message there, which was read
     as the answer. The answer now comes on its own `MessageChannel`. Checked with the bundled worker in a real browser:
     the two-page PDF read, the scan refused, the .docx read, and pdf.js's stray message ignored.
+  - **Deployed as `149ddb0`** (CI bumped arch-infra itself) and checked live: a .docx in the brief at creation, a PDF
+    on a message (chip "text from PDF · 254 characters"), the scan refused as one, and a DeepSeek Flash seat answered
+    the quote number, the 24 TB price and page 2's terms from both files.
+  - **Seen while deploying:** the API uses Recreate, so a deploy leaves about 15 seconds with no API, and a tab that
+    loads then is sent to sign-in, because `SessionGate` treats any `/api/me` failure as signed out. The login itself
+    is kept.
   - **Watch out:** text with invisible characters written as `\u200B`-style escapes came out as the raw characters
     in files written by this session's tools, so `tidy()` builds them with `String.fromCharCode`.
 
