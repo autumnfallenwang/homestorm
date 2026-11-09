@@ -19,6 +19,11 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **Settings → Back to meetings** returns to the meeting this tab came from (`sessionStorage`, only `/` or
     `/m/<id>`).
   - **Concise** asks for about 150 to 250 words, and the floor note ends with the same reminder (ADR 0012).
+  - **Deployed as `b3de617`** (arch-infra `b8bef5e`, tags by hand) and checked in the test meeting: no strikethrough
+    left, the list says "Decision posted · 4 seats", the export opens with the room rules, the repeated page shows
+    once, and Back from Settings → Appearance returns to the meeting. Concise, on a similar multi-part question, before
+    → after (words, list markers included): Claude 453–653 → 293, GPT 263–294 → 232, DeepSeek V4 Pro 385–402 → 283,
+    DeepSeek Flash 511–536 → 257.
 
 - **Message cost from llmgw 0.8.0.** llmgw priced every reply but only logged it, so every message's cost was empty.
   llmgw 0.8.0 adds `cost_usd` to `usage` and returns its own `req_id` in `X-Request-Id`, logging ours as `request_id`.
