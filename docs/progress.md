@@ -11,6 +11,8 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     DeepSeek Flash, 3 of 6 for GPT-5.6 Luna; GPT-6 Luna averaged 3 even on "must search". Nothing told seats the budget.
     Now the web guidance says "up to 6 calls; most questions need 2 to 4; stop once you can answer", and every tool
     result ends with how many are left ("(4 web calls left this turn.)", or "answer now" at none).
+    Deployed as `87aac8d` and checked with the same kind of price question: DeepSeek Flash stopped at 4 calls in 16 s
+    (it used all 6, in 63 s, in the full test), GPT-6 Luna at 4 in 18 s. One sample; worth watching in real use.
   - **Drafts:** the guidance now says a draft, beta, release candidate or preview isn't a release (mcpgw M10: GPT-5.6
     Luna read PostgreSQL's draft 19.0 notes as a release, twice).
   - **Failed calls** (19 of 131): 10 sites refusing (the seat is told not to retry), 6 deliberate checks in the mcpgw
