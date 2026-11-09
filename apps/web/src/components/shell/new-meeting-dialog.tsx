@@ -124,7 +124,7 @@ export function NewMeetingDialog({ children }: { children: ReactNode }) {
             <div className="flex items-start gap-2">
               <AttachButton
                 onFiles={(f) => void addFiles(f)}
-                label="Add images or text files to the brief"
+                label="Add images, PDFs, Word or text files to the brief"
               />
               <p
                 className={cn(

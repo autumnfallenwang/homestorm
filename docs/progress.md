@@ -6,6 +6,16 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Attachments phase 2: PDF and Word files** ([ADR 0019](adr/0019-pdf-and-word-files-read-in-the-browser.md)). The
+  browser reads them into text in a Web Worker (one per file, 20 MB and 20 seconds at most) and attaches the text, so
+  the server never parses either format; the API didn't change. `unpdf` 1.9.1 for PDFs (each page marked "[Page N]")
+  and `mammoth` 1.13.0 for .docx, pinned, loaded only in the worker. A PDF with no text is refused as a likely scan; a
+  damaged, locked or misnamed file says so. The chip reads "text from PDF" or "text from Word". Tested on a two-page
+  PDF and a .docx made by LibreOffice and an image-only PDF. Asked first: in homestorm or mcpgw? Neither server: the
+  browser, as images already are; mcpgw stays the place for phase 3's retrieval.
+  - **Watch out:** text with invisible characters written as `\u200B`-style escapes came out as the raw characters
+    in files written by this session's tools, so `tidy()` builds them with `String.fromCharCode`.
+
 - **Three small fixes:**
   - **Files at creation:** the New meeting dialog takes the brief's images and text files (paperclip, paste or drop),
     and `POST /api/meetings` saves them with the text as one brief version (`briefAttachments`). Files the brief can't

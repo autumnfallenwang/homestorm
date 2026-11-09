@@ -223,7 +223,7 @@ export function BriefDialog({ draft, onClose }: { draft: string | null; onClose:
         <div className="flex items-start gap-2">
           <AttachButton
             onFiles={(f) => void addFiles(f)}
-            label="Add images or text files to the brief"
+            label="Add images, PDFs, Word or text files to the brief"
           />
           <p
             className={cn(

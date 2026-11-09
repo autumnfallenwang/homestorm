@@ -1,5 +1,5 @@
 // Getting files ready in the browser (ADR 0016): images scaled to 2,048 px and re-encoded when large, text files
-// read as UTF-8. The API checks everything again.
+// read as UTF-8, PDF and Word files turned into text in a Web Worker (ADR 0019). The API checks everything again.
 
 import {
   ATTACHMENT_LIMITS,
@@ -8,6 +8,8 @@ import {
   type ImageMimeType,
   isTextFileName,
 } from "@homestorm/shared";
+import { documentKind } from "./documents/kind";
+import { readDocument } from "./documents/read";
 
 /** A file waiting in the message box or the brief editor. */
 export type PendingFile = {
@@ -45,6 +47,17 @@ async function readFile(file: File): Promise<PendingFile> {
   if (file.type.startsWith("image/")) {
     throw new Error(`${name}: only PNG, JPEG, WebP and GIF images.`);
   }
+  const doc = documentKind(name, file.type);
+  if (doc) {
+    // Seats get the text, like any text file; the server never opens the PDF or Word file itself.
+    const { text } = await readDocument(file, doc, name);
+    if (text.length > ATTACHMENT_LIMITS.textFileChars) {
+      throw new Error(
+        `${name} has ${text.length.toLocaleString("en-US")} characters of text; the limit is ${ATTACHMENT_LIMITS.textFileChars.toLocaleString("en-US")}. Attach the part that matters.`,
+      );
+    }
+    return { key, kind: "text", name, sizeBytes: file.size, text };
+  }
   if (file.type.startsWith("text/") || file.type === "application/json" || isTextFileName(name)) {
     const text = await file.text();
     if (text.includes("\u0000")) throw new Error(`${name} isn't a text file.`);
@@ -56,7 +69,7 @@ async function readFile(file: File): Promise<PendingFile> {
     }
     return { key, kind: "text", name, sizeBytes: file.size, text };
   }
-  throw new Error(`${name}: homestorm takes images and text files (PDFs come later).`);
+  throw new Error(`${name}: homestorm takes images, text files, PDFs and Word (.docx) files.`);
 }
 
 async function readImage(file: File, key: string, name: string): Promise<PendingFile> {

@@ -80,7 +80,7 @@
 
 | Phase | What |
 |---|---|
-| 2 | PDF and DOCX, as text extracted on the server |
+| 2 | PDF and DOCX as text, read in the browser instead of on the server: [ADR 0019](0019-pdf-and-word-files-read-in-the-browser.md), built 2026-11-08 |
 | 3 | Large documents through retrieval instead of inline (mcpgw's planned `docs_search`, ADR 0014) |
 
 ## Alternatives considered

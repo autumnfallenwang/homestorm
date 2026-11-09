@@ -163,7 +163,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 
 - [x] **Phase 1:** images (PNG, JPEG, WebP, GIF) and text files on the chair's messages and in the brief. Paperclip,
   drag and drop, paste; resized in the browser; thumbnails and a full-size viewer; text-only seats named in a hint
-- [ ] **Phase 2:** PDF and DOCX, as extracted text
+- [x] **Phase 2:** PDF and DOCX, read into text in the browser in a Web Worker, so the server never parses them
+  ([ADR 0019](adr/0019-pdf-and-word-files-read-in-the-browser.md))
 - [ ] **Phase 3:** large documents through retrieval (mcpgw `docs_search`)
 
 ### Done after v1: the meeting brief and the full-context policy ✅
@@ -210,8 +211,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 
 ### Next, in order
 
-1. **Attachments phase 2:** PDF and DOCX as extracted text, read in a capped worker with a memory watch, as mcpgw does
-   for PDFs (its ADR 0011: a 0.2 MB PDF peaked at 626 MB there)
+1. ~~**Attachments phase 2**~~: done 2026-11-08, in the browser instead of a server worker
+   ([ADR 0019](adr/0019-pdf-and-word-files-read-in-the-browser.md))
 2. **Tuning from real meetings,** with mcpgw's M10: drafts and release candidates in the web guidance, and whether
    seats still use all 6 calls
 3. **One meeting feature from "Later":** a poll (each seat's position and confidence) is the smallest

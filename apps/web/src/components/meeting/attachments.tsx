@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import type { PendingFile } from "@/lib/attachments";
+import { DOCUMENT_ACCEPT, DOCUMENT_LABEL, documentKind } from "@/lib/documents/kind";
 import { cn } from "@/lib/utils";
 
 /** One file as the galleries and the viewer show it: saved (a URL) or still pending (a data URL or its text). */
@@ -53,7 +54,10 @@ export function shownPending(files: PendingFile[]): Shown[] {
 
 function sizeLabel(f: Shown): string {
   if (f.kind === "image") return f.width && f.height ? `${f.width}×${f.height}` : "image";
-  return `${(f.textChars ?? 0).toLocaleString("en-US")} characters`;
+  const chars = `${(f.textChars ?? 0).toLocaleString("en-US")} characters`;
+  // A PDF or Word file arrives as its text (ADR 0019); say so, since the original isn't kept.
+  const doc = documentKind(f.name, "");
+  return doc ? `text from ${DOCUMENT_LABEL[doc]} · ${chars}` : chars;
 }
 
 /**
@@ -234,7 +238,7 @@ function FileViewer({
 export function AttachButton({
   onFiles,
   disabled,
-  label = "Attach images or text files",
+  label = "Attach images, PDFs, Word or text files",
 }: {
   onFiles: (files: File[]) => void;
   disabled?: boolean;
@@ -255,7 +259,7 @@ export function AttachButton({
         multiple
         className="sr-only"
         disabled={disabled}
-        accept="image/png,image/jpeg,image/webp,image/gif,text/*,.md,.csv,.json,.log,.yaml,.yml,.toml,.ts,.tsx,.js,.py,.go,.rs,.java,.sql,.sh,.xml,.html,.css"
+        accept={`image/png,image/jpeg,image/webp,image/gif,text/*,.md,.csv,.json,.log,.yaml,.yml,.toml,.ts,.tsx,.js,.py,.go,.rs,.java,.sql,.sh,.xml,.html,.css,${DOCUMENT_ACCEPT}`}
         onChange={(e) => {
           onFiles(Array.from(e.target.files ?? []));
           e.target.value = "";

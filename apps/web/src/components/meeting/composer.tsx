@@ -256,7 +256,7 @@ export function Composer() {
         >
           {dragging && (
             <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl bg-brand-soft/70 text-sm font-medium text-brand">
-              Drop images or text files
+              Drop images, PDFs, Word or text files
             </div>
           )}
           {query !== null && candidates.length > 0 && (
