@@ -13,6 +13,10 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   damaged, locked or misnamed file says so. The chip reads "text from PDF" or "text from Word". Tested on a two-page
   PDF and a .docx made by LibreOffice and an image-only PDF. Asked first: in homestorm or mcpgw? Neither server: the
   browser, as images already are; mcpgw stays the place for phase 3's retrieval.
+  - **Found on the cluster, fixed:** PDFs failed with "quote.pdf undefined." while Word files worked. pdf.js, finding
+    itself in a worker, sets itself up as a pdf.js worker on `self` and posts a "ready" message there, which was read
+    as the answer. The answer now comes on its own `MessageChannel`. Checked with the bundled worker in a real browser:
+    the two-page PDF read, the scan refused, the .docx read, and pdf.js's stray message ignored.
   - **Watch out:** text with invisible characters written as `\u200B`-style escapes came out as the raw characters
     in files written by this session's tools, so `tidy()` builds them with `String.fromCharCode`.
 

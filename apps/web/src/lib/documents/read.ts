@@ -23,8 +23,11 @@ export async function readDocument(
         () => reject(new Error(`${name} took too long to read. It may be damaged.`)),
         DOCUMENT_TIMEOUT_MS,
       );
-      worker.onmessage = (e: MessageEvent<DocumentReply>) => {
+      // Our answer comes on this channel; anything pdf.js posts on the worker itself is ignored (see worker.ts).
+      const channel = new MessageChannel();
+      channel.port1.onmessage = (e: MessageEvent<DocumentReply>) => {
         clearTimeout(timer);
+        channel.port1.close();
         const reply = e.data;
         if (reply.ok) resolve({ text: reply.text, pages: reply.pages });
         else reject(new Error(`${name} ${reply.message}.`));
@@ -34,8 +37,8 @@ export async function readDocument(
         e.preventDefault();
         reject(new Error(`${name} couldn't be read.`));
       };
-      const job: DocumentJob = { kind, bytes };
-      worker.postMessage(job, [bytes]);
+      const job: DocumentJob = { kind, bytes, reply: channel.port2 };
+      worker.postMessage(job, [bytes, channel.port2]);
     });
   } finally {
     worker.terminate();
