@@ -12,6 +12,10 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   `spendUsd` (`packages/shared/src/names.ts`) shows cost for DeepSeek only, on the answer line, in the header total and
   in the export. ADR 0009 updated. Checked: llmgw run locally against DeepSeek Flash (a stream ended with
   `cost_usd: 0.000009`, and `request_id` was on its log lines); a new API test exports DeepSeek's cost and not Claude's.
+  - **Deployed:** homestorm `ad1abb9` (arch-infra `b6e3d93`, tags by hand) and llmgw 0.8.0 (`85f306c`, PR #53, which
+    its CI rolled out). Checked live in the test meeting: a DeepSeek Flash answer reads `$0.0017` and the header
+    `DeepSeek $0.0017`; Claude's $0.0536 list-price figure is stored but not shown; both turns are in llmgw's log
+    under homestorm's `request_id`, and each message stores llmgw's `req_id`.
 
 - **A full meeting test on the cluster** through Playwright, with the user signed in ("E2E test: NAS is 93% full…",
   safe to delete). Four seats (Claude Sonnet 5.5, GPT-6 Luna, DeepSeek V4 Pro, DeepSeek Flash), a CSV and a chart in
