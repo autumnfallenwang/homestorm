@@ -68,14 +68,20 @@ spec:
           volumeMounts:
             - name: data
               mountPath: {{ .Values.db.persistence.mountPath }}
+  # apiVersion, kind and volumeMode are what Kubernetes fills in anyway. Without them in the chart, Argo CD's diff
+  # sees the live StatefulSet as different and shows the app OutOfSync for good (Loki's chart writes them too).
+  # They match the live object, so applying them changes nothing (a claim template can't be changed in place).
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: data
         labels:
           {{- include "homestorm.labels" (dict "context" . "component" "db") | nindent 10 }}
       spec:
         accessModes:
           - ReadWriteOnce
+        volumeMode: Filesystem
         storageClassName: {{ .Values.db.persistence.storageClass }}
         resources:
           requests:

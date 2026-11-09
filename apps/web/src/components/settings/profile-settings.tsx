@@ -187,8 +187,16 @@ function PasswordForm() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {/* Lets password managers tie the new password to this login. */}
-      <input type="hidden" autoComplete="username" value={me.user.email} readOnly />
+      {/* Lets password managers tie the new password to this login. A real field, kept out of sight: Chrome doesn't
+          count type="hidden" as the form's username, and said so in the console. */}
+      <input
+        type="email"
+        name="username"
+        autoComplete="username"
+        value={me.user.email}
+        readOnly
+        hidden
+      />
       {field("password-current", "Current password", current, setCurrent, "current-password")}
       {field("password-new", "New password", next, setNext, "new-password")}
       {field("password-confirm", "Confirm new password", confirm, setConfirm, "new-password")}

@@ -6,6 +6,18 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Three loose ends:**
+  - **Argo CD OutOfSync, found:** the database StatefulSet's claim template left out `apiVersion`, `kind` and
+    `volumeMode`, which Kubernetes fills in, so Argo's diff never matched. Loki's live template looks the same but its
+    chart writes them, and it's Synced. The chart now writes them too; they equal the live values, so applying changes
+    nothing (checked with a server-side dry run). homecal, homenews, homeparentcontrol and homework are OutOfSync the
+    same way, in their own charts.
+  - **Profile's password form** gets a real (hidden) username field. Chrome doesn't count `type="hidden"` and said so
+    in the console, so password managers couldn't tie a new password to the login.
+  - **CI's arch-infra bump** takes `ARCH_INFRA_DEPLOY_KEY` (a deploy key that can push to arch-infra only) or
+    `ARCH_INFRA_TOKEN`. Neither is set yet: making the key and storing it as a secret is for the user (commands in
+    the README under Deploy); auto mode doesn't write secrets.
+
 - **Fixes from the full meeting test** (below):
   - **`~` isn't strikethrough any more.** Only `~~double~~` is (`singleTilde: false` in `markdown.tsx`), so "~$350
     (~$25/TB)" reads as written.

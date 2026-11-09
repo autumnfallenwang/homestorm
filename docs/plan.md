@@ -186,7 +186,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
 - [x] **The brief in the header:** Brief (or Add brief) left of Export, pinned under the header while shown
 - [x] **A ⋯ menu on each meeting in the list,** with Delete meeting… asked again inside the menu
 - [x] **Both side panels fold** into narrow rails; the browser remembers it
-- [ ] **By the user:** an `ARCH_INFRA_TOKEN` repo secret, so CI bumps image tags in arch-infra itself
+- [ ] **By the user:** an `ARCH_INFRA_DEPLOY_KEY` (or `ARCH_INFRA_TOKEN`) repo secret, so CI bumps image tags in
+  arch-infra itself. CI takes either since 2026-11-08; the commands are in the README under Deploy
 
 ### Web tools as a room rule, 2026-11-08 ([ADR 0017](adr/0017-web-tools-room-rule.md))
 
