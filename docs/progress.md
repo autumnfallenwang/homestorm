@@ -4,6 +4,23 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-09
+
+- **Tuning from real meetings, first pass.** All 73 seat turns on the cluster (6 meetings, no errors):
+  - **Web calls:** 12 of the 26 turns with web tools used all 6 calls: 4 of 6 for Claude Haiku 5.5, 5 of 8 for
+    DeepSeek Flash, 3 of 6 for GPT-5.6 Luna; GPT-6 Luna averaged 3 even on "must search". Nothing told seats the budget.
+    Now the web guidance says "up to 6 calls; most questions need 2 to 4; stop once you can answer", and every tool
+    result ends with how many are left ("(4 web calls left this turn.)", or "answer now" at none).
+  - **Drafts:** the guidance now says a draft, beta, release candidate or preview isn't a release (mcpgw M10: GPT-5.6
+    Luna read PostgreSQL's draft 19.0 notes as a release, twice).
+  - **Failed calls** (19 of 131): 10 sites refusing (the seat is told not to retry), 6 deliberate checks in the mcpgw
+    test meeting, 3 links from memory refused by the URL rule. Nothing to change.
+  - **DeepSeek V4 Pro** thinks the longest: a median of 56 s per answer (168 s at most) and about 1,400 output tokens
+    for 280 words, at Low effort, where the other models' median is 11 to 33 s. Low is the lowest setting homestorm
+    offers; llmgw turns DeepSeek's thinking off only when no effort is sent. An "Off" effort is the user's call.
+  - **Polls, live:** 4 seats answered in the exact format in 1 to 3 s each, V4 Pro included. After a new fact, "Poll
+    again" showed the moves (−17, +3, −4, −13 points).
+
 ## 2026-11-08
 
 - **Polls** ([ADR 0020](adr/0020-polls.md)). Poll in the meeting header: a question and up to 6 options (or none).

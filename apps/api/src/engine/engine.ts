@@ -53,6 +53,7 @@ import {
   ALREADY_DONE,
   allowedUrls,
   callKey,
+  callsLeftNote,
   canonicalUrl,
   FORCED_SEARCH,
   LIMIT_REACHED,
@@ -1047,7 +1048,12 @@ export class Engine {
           const started = Date.now();
           const ran = await this.runToolCall(call, allowed, { requestId, signal: ac.signal });
           activity[activity.length - 1] = ran.activity;
-          messages.push({ role: "tool", tool_call_id: call.id, content: ran.text });
+          // Each result says how many calls are left, so a seat paces itself instead of running into the limit.
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: `${ran.text}\n\n${callsLeftNote(callsLeft)}`,
+          });
           research.push(`${ran.activity.tool}: ${ran.activity.input}\n\n${ran.text}`);
           await this.patch(msg, { toolCalls: [...activity] });
           log.info(

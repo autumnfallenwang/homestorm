@@ -661,6 +661,15 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       });
       expect(second.at(-1)).toMatchObject({ role: "tool", tool_call_id: "call-web_search" });
       expect(String(second.at(-1)?.content)).toContain("Gold is $1,234.56");
+      // The seat knows its budget, and how much of it is left after each call (2026-11-09 tuning).
+      expect(turns[0]?.messages[0]?.content).toContain("up to 6 web calls this turn");
+      expect(turns[0]?.messages[0]?.content).toContain(
+        "a release candidate or a preview isn't a release",
+      );
+      expect(String(second.at(-1)?.content)).toMatch(/\(5 web calls left this turn\.\)$/);
+      expect(String(turns[2]?.messages.at(-1)?.content)).toMatch(
+        /\(4 web calls left this turn\.\)$/,
+      );
 
       const msg = await lastMessage(w);
       expect(msg.status).toBe("done");
@@ -839,6 +848,12 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         expect(research).toContain("no more tool calls");
         expect(research).toContain("web_search: q1");
         expect(research).toContain("web_search: q6");
+        // The last step before the forced answer had been told it had one call left.
+        expect(String(turns[5]?.messages.at(-1)?.content)).toMatch(
+          /\(1 web call left this turn\.\)$/,
+        );
+        // The research shown in the forced answer is the results alone, without the notes.
+        expect(research).not.toContain("left this turn");
         expect((await lastMessage(w)).content).toBe("From what I found.");
       });
 

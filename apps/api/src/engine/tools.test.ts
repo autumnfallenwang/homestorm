@@ -2,6 +2,7 @@ import type { Message } from "@homestorm/shared";
 import { describe, expect, it } from "vitest";
 import {
   allowedUrls,
+  callsLeftNote,
   canonicalUrl,
   readToolCall,
   researchNote,
@@ -135,5 +136,13 @@ describe("what goes into the record", () => {
     expect(note).toContain("no more tool calls");
     expect(note).toContain("web_search: a");
     expect(note.length).toBeLessThan(17_000);
+  });
+});
+
+describe("callsLeftNote", () => {
+  it("says how many calls are left, and to answer when none are", () => {
+    expect(callsLeftNote(5)).toBe("(5 web calls left this turn.)");
+    expect(callsLeftNote(1)).toBe("(1 web call left this turn.)");
+    expect(callsLeftNote(0)).toBe("(No web calls left this turn: answer now from what you have.)");
   });
 });

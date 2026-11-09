@@ -21,6 +21,16 @@ export const URL_REFUSED =
 export const LIMIT_REACHED =
   "This call wasn't run: the limit for this turn was reached. Answer from what you have.";
 
+/**
+ * Ends every tool result (2026-11-09 tuning): on the cluster, 12 of 26 turns with web tools ran into the 6-call limit,
+ * most of Claude Haiku's and DeepSeek Flash's, and nothing told them how many calls they had.
+ */
+export function callsLeftNote(left: number): string {
+  return left > 0
+    ? `(${left} web call${left === 1 ? "" : "s"} left this turn.)`
+    : "(No web calls left this turn: answer now from what you have.)";
+}
+
 /** A second identical call in one turn isn't run: a seat fetched the same page twice in a cluster meeting. */
 export const ALREADY_DONE =
   "This call wasn't run: you already made this exact call in this turn, and its result is above. Use that result, or try a different search or page.";
