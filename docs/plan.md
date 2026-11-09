@@ -183,7 +183,8 @@ Decided in [ADR 0014](adr/0014-tools-through-mcpgw.md): tools come from **mcpgw*
   lists, takes, fetches and restores them
 - [x] **Backup on the cluster:** deployed as `63b39e9`; the first one taken with `scripts/backup.sh now`, fetched back
   and restored into a scratch database with the live counts
-- [ ] **By the user:** where an off-machine copy goes, if anywhere (`scripts/backup.sh fetch`)
+- [x] **By the user:** no off-machine copy (decided 2026-11-08). The nightly backups on the cluster are enough;
+  `scripts/backup.sh fetch` still copies one off if that changes
 - [x] **The brief in the header:** Brief (or Add brief) left of Export, pinned under the header while shown
 - [x] **A ⋯ menu on each meeting in the list,** with Delete meeting… asked again inside the menu
 - [x] **Both side panels fold** into narrow rails; the browser remembers it

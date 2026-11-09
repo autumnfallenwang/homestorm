@@ -6,6 +6,9 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Backups stay on the cluster.** The user decided no off-machine copy is needed; the plan's last open "by the user"
+  item is closed.
+
 - **Two small fixes:**
   - **A deploy no longer sends open tabs to sign-in.** `SessionGate` took any failure of `/api/me` as signed out, so a
     tab that loaded in the ~15 seconds a deploy restarts the API (one pod, Recreate) went to the sign-in page and lost
