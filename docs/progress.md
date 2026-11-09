@@ -14,6 +14,9 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **CI on Node 24 actions:** `actions/checkout@v7`, `actions/setup-node@v7`, the Docker actions at llm-gateway's
     versions, and `pnpm/action-setup@v6.1.0` (pinned: `v6` pointed at a release under two weeks old). GitHub warned
     on every run that the old ones target Node 20.
+  - **Deployed as `7abe6eb`:** its CI run had no Node 20 warnings. Checked in the browser with `/api/me` blocked
+    (restarting the API pod for a real gap is refused in auto mode): the meeting page stayed put, said "Trying
+    again…", asked 3 times in 3.5 s, and loaded when unblocked. A 401 still goes to the sign-in page.
 
 - **CI's arch-infra token, like the other apps:** homestorm's `ARCH_INFRA_TOKEN` is now the same fine-grained token
   llm-gateway, homework and homecal use. The deploy key from earlier today was removed from arch-infra, and its secret
