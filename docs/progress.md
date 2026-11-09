@@ -6,6 +6,15 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Two small fixes:**
+  - **A deploy no longer sends open tabs to sign-in.** `SessionGate` took any failure of `/api/me` as signed out, so a
+    tab that loaded in the ~15 seconds a deploy restarts the API (one pod, Recreate) went to the sign-in page and lost
+    its place. Only a 401 does that now; otherwise it shows "Can't reach homestorm right now. Trying again…" and asks
+    again after 1, 2, 4 and 8 seconds, then every 10.
+  - **CI on Node 24 actions:** `actions/checkout@v7`, `actions/setup-node@v7`, the Docker actions at llm-gateway's
+    versions, and `pnpm/action-setup@v6.1.0` (pinned: `v6` pointed at a release under two weeks old). GitHub warned
+    on every run that the old ones target Node 20.
+
 - **CI's arch-infra token, like the other apps:** homestorm's `ARCH_INFRA_TOKEN` is now the same fine-grained token
   llm-gateway, homework and homecal use. The deploy key from earlier today was removed from arch-infra, and its secret
   from homestorm. The workflow still takes either.
