@@ -9,6 +9,7 @@ import {
   type Seat,
   seatWebAccess,
   sourceLabel,
+  spendUsd,
   toolSummary,
 } from "@homestorm/shared";
 
@@ -149,7 +150,8 @@ export function exportMarkdown(
       meta.push(
         `${m.usage.estimated ? "≈" : ""}${m.usage.totalTokens.toLocaleString("en-US")} tokens`,
       );
-    if (m.costUsd !== null) meta.push(`$${m.costUsd.toFixed(4)}`);
+    const spend = spendUsd(m);
+    if (spend !== null) meta.push(`$${spend.toFixed(4)}`);
     if (m.wrapKind)
       meta.push(`${WRAP_LABEL[m.wrapKind]}${m.hiddenFromSeats ? " (not posted)" : ""}`);
     const target = m.replyToId ? byId.get(m.replyToId) : undefined;

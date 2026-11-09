@@ -317,6 +317,29 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(md).toMatch(/persona: Play the skeptic\. Push back on extra work\.[^|]*…/);
   });
 
+  it("keeps llmgw's cost and exports it as spend for DeepSeek only", async () => {
+    const { call, engine, llm } = setup();
+    // llmgw 0.8.0 prices every reply; for a subscription it's a list-price equivalent, not money paid.
+    llm.on("claude-opus-5-5", { chunks: ["Claude."], costUsd: 0.0668 });
+    llm.on("deepseek-v4-pro", { chunks: ["DeepSeek."], costUsd: 0.0123 });
+    const id = (await call("POST", "/api/meetings", { title: "Cost" })).body.id as string;
+    await call("POST", `/api/meetings/${id}/seats`, { model: "claude-opus-5-5" });
+    await call("POST", `/api/meetings/${id}/seats`, { model: "deepseek-v4-pro" });
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "Q",
+      mode: "blind",
+      targets: "everyone",
+    });
+    await engine.waitIdle(id);
+
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    const costs = state.messages.filter((m) => m.authorKind === "seat").map((m) => m.costUsd);
+    expect(costs.sort()).toEqual([0.0123, 0.0668]); // both kept, as llmgw sent them
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("$0.0123");
+    expect(md).not.toContain("$0.0668");
+  });
+
   it("records room-rule changes, and posts a wrap-up only when the chair says so", async () => {
     const { call, engine, llm } = setup();
     llm.on("claude-opus-5-5", { chunks: ["Answer."] }, { chunks: ["DECISION: B"] });

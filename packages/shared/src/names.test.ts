@@ -6,6 +6,7 @@ import {
   seatNameClash,
   seatNameClashMessage,
   sourceLabel,
+  spendUsd,
   uniqueSeatName,
 } from "./names.js";
 
@@ -31,6 +32,17 @@ describe("sourceLabel", () => {
     expect(sourceLabel("anthropic")).toBe("Claude · subscription");
     expect(sourceLabel("openai-codex")).toBe("GPT · ChatGPT");
     expect(sourceLabel("deepseek")).toBe("DeepSeek · prepaid");
+  });
+});
+
+describe("spendUsd", () => {
+  it("counts llmgw's cost as spend for DeepSeek only", () => {
+    expect(spendUsd({ ownedBy: "deepseek", costUsd: 0.0123 })).toBe(0.0123);
+    expect(spendUsd({ ownedBy: "deepseek", costUsd: null })).toBeNull();
+    // The subscriptions' figure is a list-price equivalent, not money paid.
+    expect(spendUsd({ ownedBy: "anthropic", costUsd: 0.0668 })).toBeNull();
+    expect(spendUsd({ ownedBy: "openai-codex", costUsd: 0.0011 })).toBeNull();
+    expect(spendUsd({ ownedBy: null, costUsd: 0.5 })).toBeNull();
   });
 });
 

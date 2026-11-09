@@ -21,6 +21,8 @@ export interface Script {
   /** Throw this after the chunks. */
   error?: LlmError;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  /** llmgw's `cost_usd` for this call (llmgw 0.8.0+). */
+  costUsd?: number;
   /** After the chunks, ask for these tools to be run. */
   toolCalls?: ToolCall[];
 }
@@ -98,7 +100,7 @@ export class FakeLlm implements LlmClient {
       finishReason: script.toolCalls?.length ? "tool_calls" : "stop",
       toolCalls: script.toolCalls ?? [],
       usage: script.usage ?? null,
-      costUsd: null,
+      costUsd: script.costUsd ?? null,
       llmgwReqId: null,
     };
   }

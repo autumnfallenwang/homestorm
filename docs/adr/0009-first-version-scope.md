@@ -58,6 +58,11 @@ it as "≈ N tokens". Cost is shown only when llmgw reports it.
 - **Claude's prompt count:** llmgw 0.6.0 reports only the uncached part as `prompt_tokens` (4 of a 7,233-token
   prompt read from cache), while `total_tokens` counts all of it. homestorm takes the prompt as the larger of
   `prompt_tokens` and `total − completion` (`readUsage` in `apps/api/src/services/llmgw.ts`).
-- **Still missing on streams:** `cost_usd` and llmgw's `req_id`. Tracing to llmgw's log line stays by model and time.
+- **Cost and request IDs, llmgw 0.8.0 (2026-11-08):** the usage chunk now carries `cost_usd`, and llmgw returns its
+  `req_id` in the `X-Request-Id` header and logs homestorm's `homestorm-<uuid>` as `request_id` on every line of the
+  turn. homestorm already read both, so they're saved with no client change. llmgw prices every reply at list price,
+  so only DeepSeek's figure is money paid; the answer line, the header total and the export show cost for DeepSeek
+  only (`spendUsd` in `packages/shared/src/names.ts`). A turn with web tools makes several llmgw calls, and its cost
+  is their sum.
 - **The context meter** shows llmgw's count when it has one. Trimming keeps using homestorm's own estimate, which is
   known before the call and errs high (it was 1,630 for a view llmgw counted at 941).

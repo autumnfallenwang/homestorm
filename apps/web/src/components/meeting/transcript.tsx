@@ -1,6 +1,12 @@
 "use client";
 
-import { type Message, type Round, stripSpeakerTag, type ToolActivity } from "@homestorm/shared";
+import {
+  type Message,
+  type Round,
+  spendUsd,
+  stripSpeakerTag,
+  type ToolActivity,
+} from "@homestorm/shared";
 import {
   AlertTriangle,
   Check,
@@ -391,7 +397,9 @@ function MetaLine({ message }: { message: Message }) {
       (new Date(message.finishedAt).getTime() - new Date(message.startedAt).getTime()) / 1000;
     parts.push(`${s < 10 ? s.toFixed(1) : Math.round(s)}s`);
   }
-  if (message.costUsd !== null) parts.push(`$${message.costUsd.toFixed(4)}`);
+  // Only money actually paid: llmgw's figure for a subscription is a list-price equivalent.
+  const spend = spendUsd(message);
+  if (spend !== null) parts.push(`$${spend.toFixed(4)}`);
   if (message.reasoningEffort && message.reasoningEffort !== "low")
     parts.push(`effort ${message.reasoningEffort}`);
   return (

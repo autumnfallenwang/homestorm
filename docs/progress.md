@@ -6,6 +6,27 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Message cost from llmgw 0.8.0.** llmgw priced every reply but only logged it, so every message's cost was empty.
+  llmgw 0.8.0 adds `cost_usd` to `usage` and returns its own `req_id` in `X-Request-Id`, logging ours as `request_id`.
+  homestorm already read both. llmgw's figure for Claude and GPT is a list-price equivalent, not money paid, so a new
+  `spendUsd` (`packages/shared/src/names.ts`) shows cost for DeepSeek only, on the answer line, in the header total and
+  in the export. ADR 0009 updated. Checked: llmgw run locally against DeepSeek Flash (a stream ended with
+  `cost_usd: 0.000009`, and `request_id` was on its log lines); a new API test exports DeepSeek's cost and not Claude's.
+
+- **A full meeting test on the cluster** through Playwright, with the user signed in ("E2E test: NAS is 93% full…",
+  safe to delete). Four seats (Claude Sonnet 5.5, GPT-6 Luna, DeepSeek V4 Pro, DeepSeek Flash), a CSV and a chart in
+  the brief, a quote photo and a .md file on a message, the web tools room rule changed partway, in turn, Reply to, an
+  @mention, an edited brief, a Decision wrap-up, the export and dark mode. All 16 turns finished, with no API errors;
+  DeepSeek cost about $0.12. Every seat read the files, including V4 Pro through llmgw's image descriptions, and web
+  tools followed each seat's setting through the rule changes.
+  - **Found:** a `~` meaning "about" turns text into strikethrough when another `~` follows (remark-gfm's single
+    tilde); "Concise" is loosely followed (Claude and Flash wrote about 3,500 characters); the meetings list says
+    "Minutes written" for any wrap-up, posted or not; the export's seat notes show `web tools: must` instead of the
+    label; a seat can fetch the same page twice in a turn; Settings' "Back to meetings" goes to `/`, not the meeting.
+    Seen once and not reproduced: the brief editor closing by itself, and message text doubling after an @mention.
+  - **Not homestorm's:** DeepSeek V4 Pro thought for 168 s (9,509 output tokens at Low effort) in round 1; the empty
+    cost is fixed above.
+
 - **Both changes below deployed as `539daf2`** (CI green; image tags updated by hand in arch-infra `79048f6`, since
   `ARCH_INFRA_TOKEN` is still unset).
   - **Migration 0007 ran at API start on the live database.** 13 seats follow the room rule, 9 keep "on", the 6

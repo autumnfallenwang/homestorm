@@ -1,6 +1,13 @@
 // How things read in the UI: allowance lines, seat states, tokens, times. Pure, so it's unit tested.
 
-import type { Limits, MeetingState, Message, Round, Seat } from "@homestorm/shared";
+import {
+  type Limits,
+  type MeetingState,
+  type Message,
+  type Round,
+  type Seat,
+  spendUsd,
+} from "@homestorm/shared";
 
 export interface AllowanceLine {
   text: string;
@@ -120,7 +127,8 @@ export function meetingTotals(messages: Message[]): MeetingTotals {
       tokens += m.usage.totalTokens;
       estimated ||= m.usage.estimated;
     }
-    if (m.ownedBy === "deepseek" && m.costUsd !== null) usd = (usd ?? 0) + m.costUsd;
+    const spend = spendUsd(m);
+    if (spend !== null) usd = (usd ?? 0) + spend;
   }
   return { tokens, estimated, deepseekUsd: usd };
 }

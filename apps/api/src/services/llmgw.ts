@@ -2,8 +2,8 @@
 // names. It never retries on another model, and never retries silently at all: `maxRetries: 0`, because the
 // openai SDK would otherwise retry 429s and 5xx behind the chair's back.
 //
-// llmgw 0.5.0 streams text and reasoning deltas only (ADR 0009). `usage`, `cost_usd` and its `req_id` are read when
-// present, from a stream chunk or the response headers, so nothing changes here when llmgw starts sending them.
+// The stream gives text, reasoning and tool-call deltas, then a usage chunk (ADR 0009). Since llmgw 0.8.0 that chunk
+// carries `cost_usd`, and the `X-Request-Id` response header is llmgw's own `req_id`; both are read when present.
 
 import type { ErrorCode, LimitStatus, Limits, ModelInfo, Source } from "@homestorm/shared";
 import { SOURCES } from "@homestorm/shared";

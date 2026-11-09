@@ -98,6 +98,18 @@ export function sourceLabel(source: Source): string {
   }
 }
 
+/**
+ * What a message cost in real money, or null. llmgw prices every reply at list price (`cost_usd`, llmgw 0.8.0), but
+ * only DeepSeek is paid per request; for the subscriptions it's the API-price equivalent, not a charge, so it isn't
+ * shown as spend.
+ */
+export function spendUsd(message: {
+  ownedBy: Source | null;
+  costUsd: number | null;
+}): number | null {
+  return message.ownedBy === "deepseek" ? message.costUsd : null;
+}
+
 /** The short family name used for avatar colors and grouping. */
 export function sourceFamily(source: Source): "Claude" | "GPT" | "DeepSeek" {
   switch (source) {
