@@ -1,5 +1,5 @@
 // The meeting API end to end over HTTP (Hono's app.request), with Postgres and a scripted llmgw.
-import type { MeetingEvent, MeetingState, Seat } from "@homestorm/shared";
+import type { MeetingEvent, MeetingState, MeetingSummary, Seat } from "@homestorm/shared";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
 import { closeDb, db } from "../db/index.js";
@@ -125,7 +125,7 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
       title: "Caching",
       seatCount: 3,
       live: false,
-      hasMinutes: false,
+      postedWrapUp: null,
     });
   });
 
@@ -372,12 +372,17 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     let state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
     const decision = state.messages.find((m) => m.wrapKind === "decision")!;
     expect(decision).toMatchObject({ status: "done", hiddenFromSeats: true, visibleSeq: null });
+    const listed = async () =>
+      ((await call("GET", "/api/meetings")).body as MeetingSummary[]).find((m) => m.id === id);
+    // A draft under review isn't "posted" in the meetings list.
+    expect((await listed())?.postedWrapUp).toBeNull();
 
     const posted = await call("POST", `/api/meetings/${id}/messages/${decision.id}/post`);
     expect(posted.status).toBe(200);
     state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
     expect(posted.body).toMatchObject({ hiddenFromSeats: false, visibleSeq: state.meeting.clock });
     expect((await events()).at(-1)).toBe("You posted Claude Opus 5.5's decision");
+    expect((await listed())?.postedWrapUp).toBe("decision");
     expect((await call("POST", `/api/meetings/${id}/messages/${decision.id}/post`)).status).toBe(
       409,
     );
@@ -412,7 +417,7 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect(plain.answerLength).toBeNull();
 
     const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
-    expect(md).toContain("| Scribe | `deepseek-v4-pro` | DeepSeek · prepaid | answers: detailed |");
+    expect(md).toContain("| Scribe | `deepseek-v4-pro` | DeepSeek · prepaid | answers: Detailed |");
 
     await call("PATCH", `/api/meetings/${id}/seats/${plain.id}`, { answerLength: "concise" });
     await call("PATCH", `/api/meetings/${id}/seats/${plain.id}`, { answerLength: "concise" });
@@ -456,8 +461,12 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
     expect((await call("PATCH", `/api/meetings/${id}`, { webAccess: "always" })).status).toBe(400);
 
     const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
-    expect(md).toContain("| GPT-6 Luna | `gpt-6-luna` | GPT · ChatGPT | web tools: on |");
-    expect(md).toContain("web tools: must");
+    // The room rule at the top; a seat that follows it has no note of its own.
+    expect(md).toContain("## Room rules\n\n- Answer length: Concise\n- Web tools: Can search\n");
+    expect(md).toContain("| GPT-6 Luna | `gpt-6-luna` | GPT · ChatGPT |  |");
+    expect(md).toContain(
+      "| Checker | `deepseek-v4-pro` | DeepSeek · prepaid | web tools: Must search first |",
+    );
 
     await call("PATCH", `/api/meetings/${id}/seats/${follows.id}`, { webAccess: "off" });
     const reset = await call("PATCH", `/api/meetings/${id}/seats/${own.id}`, { webAccess: null });

@@ -24,8 +24,10 @@ export interface IntroInput {
 }
 
 const LENGTH_RULE: Record<AnswerLength, string> = {
+  // A number, not just "concise": in a cluster meeting (2026-11-08) Claude and DeepSeek Flash wrote ~3,500 characters
+  // under the old wording. The floor note repeats it, last thing before the answer.
   concise:
-    "Keep answers concise: a few short paragraphs or a short list, unless the Chair asks for more.",
+    "Keep answers concise: about 150 to 250 words, as a few short paragraphs or a short list. Skip preambles, and don't restate what others said. Go longer only when the Chair asks for more.",
   detailed: "Answer thoroughly, with the detail and examples the question needs.",
 };
 
@@ -106,7 +108,11 @@ const WRAP_TASK: Record<WrapKind, string> = {
     "List the open questions that remain after this discussion, each with a short note on why it's still open and what would settle it.",
 };
 
-export function renderFloorNote(floor: Floor): string {
+/** The length reminder at the end of a Concise seat's floor note. */
+export const CONCISE_REMINDER =
+  "Keep it to about 150 to 250 words, unless the Chair asked for more.";
+
+export function renderFloorNote(floor: Floor, answerLength?: AnswerLength): string {
   if (floor.kind === "wrap_up") {
     return `[Floor] The Chair asks you to wrap up the meeting. ${WRAP_TASK[floor.wrapKind]}`;
   }
@@ -135,6 +141,7 @@ export function renderFloorNote(floor: Floor): string {
       );
       break;
   }
+  if (answerLength === "concise") parts.push(CONCISE_REMINDER);
   return `[Floor] ${parts.join(" ")}`;
 }
 

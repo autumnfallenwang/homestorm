@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/shell/account-menu";
 import { Logo } from "@/components/shell/logo";
+import { useBackToMeetings } from "@/lib/back-to-meetings";
 import { cn } from "@/lib/utils";
 
 export const SETTINGS_TABS: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> = [
@@ -18,6 +19,8 @@ export const SETTINGS_TABS: ReadonlyArray<{ href: string; label: string; icon: L
  */
 export function SettingsSidebar() {
   const pathname = usePathname();
+  // The meeting you came from, not the home page.
+  const back = useBackToMeetings();
   const row =
     "flex items-center justify-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors md:justify-start";
   return (
@@ -31,7 +34,7 @@ export function SettingsSidebar() {
       </div>
       <nav className="flex flex-col gap-0.5 px-2">
         <Link
-          href="/"
+          href={back}
           title="Back to meetings"
           className={cn(row, "text-muted-foreground hover:bg-accent hover:text-foreground")}
         >

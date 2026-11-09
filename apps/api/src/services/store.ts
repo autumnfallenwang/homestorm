@@ -164,7 +164,7 @@ export function createStore(db: Database) {
           updatedAt: meetings.updatedAt,
           seatCount: sql<number>`(SELECT count(*)::int FROM seats s WHERE s.meeting_id = "meetings"."id" AND s.removed_at IS NULL)`,
           live: sql<boolean>`EXISTS (SELECT 1 FROM rounds r WHERE r.meeting_id = "meetings"."id" AND r.status = 'running')`,
-          hasMinutes: sql<boolean>`EXISTS (SELECT 1 FROM messages m WHERE m.meeting_id = "meetings"."id" AND m.wrap_kind IS NOT NULL AND m.status = 'done')`,
+          postedWrapUp: sql<WrapKind | null>`(SELECT m.wrap_kind FROM messages m WHERE m.meeting_id = "meetings"."id" AND m.wrap_kind IS NOT NULL AND m.status = 'done' AND NOT m.hidden_from_seats ORDER BY m.seq DESC LIMIT 1)`,
         })
         .from(meetings)
         .orderBy(desc(meetings.updatedAt));

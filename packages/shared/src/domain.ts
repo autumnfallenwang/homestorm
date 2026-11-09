@@ -116,9 +116,24 @@ export interface ToolActivity {
   detail?: string;
 }
 
+/**
+ * A turn's tool calls with each search or page that worked listed once. Since 2026-11-08 the engine doesn't run a
+ * repeat, but turns from before can hold one.
+ */
+export function distinctToolCalls(calls: readonly ToolActivity[]): ToolActivity[] {
+  const seen = new Set<string>();
+  return calls.filter((c) => {
+    if (c.status !== "ok") return true;
+    const key = `${c.tool} ${c.input}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** "Searched: "gold price" · Read: https://…", or null if nothing worked. */
 export function toolSummary(calls: readonly ToolActivity[]): string | null {
-  const worked = calls.filter((c) => c.status === "ok");
+  const worked = distinctToolCalls(calls).filter((c) => c.status === "ok");
   const searched = worked.filter((c) => c.tool === "web_search").map((c) => `"${c.input}"`);
   const read = worked.filter((c) => c.tool === "web_fetch").map((c) => c.input);
   const parts = [
@@ -243,7 +258,8 @@ export interface MeetingSummary {
   seatCount: number;
   /** A round is running now. */
   live: boolean;
-  hasMinutes: boolean;
+  /** The kind of the latest wrap-up the chair posted, or null. A draft still being reviewed doesn't count. */
+  postedWrapUp: WrapKind | null;
 }
 
 // ── Requests ────────────────────────────────────────────────────────────────

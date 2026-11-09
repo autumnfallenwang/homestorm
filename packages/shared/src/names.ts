@@ -1,6 +1,6 @@
 // Display names for models and sources. A seat's default name comes from its model ID.
 
-import type { Seat, Source } from "./domain.js";
+import type { AnswerLength, Seat, Source, WebAccess } from "./domain.js";
 
 const BRANDS: Record<string, string> = {
   claude: "Claude",
@@ -85,6 +85,17 @@ export function seatNameClashMessage(clash: Pick<Seat, "displayName" | "removedA
     ? `A seat you removed was called "${clash.displayName}", and its messages keep that name. Pick another name.`
     : `Another seat is already called "${clash.displayName}". Pick another name.`;
 }
+
+/** A setting's name, as the room rules, the seat dialogs, the event lines and the export say it. */
+export const ANSWER_LENGTH_LABEL: Record<AnswerLength, string> = {
+  concise: "Concise",
+  detailed: "Detailed",
+};
+export const WEB_ACCESS_LABEL: Record<WebAccess, string> = {
+  off: "Off",
+  on: "Can search",
+  must: "Must search first",
+};
 
 /** The source tag on a seat ("Claude · subscription"). */
 export function sourceLabel(source: Source): string {

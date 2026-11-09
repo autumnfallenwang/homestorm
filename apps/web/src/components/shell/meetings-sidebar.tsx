@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeetingSummary } from "@homestorm/shared";
+import type { MeetingSummary, WrapKind } from "@homestorm/shared";
 import {
   Loader2,
   MoreHorizontal,
@@ -29,6 +29,13 @@ import { AccountMenu } from "./account-menu";
 import { Logo } from "./logo";
 import { useMeetings } from "./meetings-context";
 import { NewMeetingDialog } from "./new-meeting-dialog";
+
+/** Under a meeting's name: the latest wrap-up the chair posted. */
+const POSTED_LABEL: Record<WrapKind, string> = {
+  minutes: "Minutes posted",
+  decision: "Decision posted",
+  open_questions: "Open questions posted",
+};
 
 const GROUP_ORDER = ["Today", "Yesterday", "This week", "Older"];
 
@@ -121,10 +128,10 @@ export function MeetingsSidebar({
                           <span className="size-1.5 animate-pulse rounded-full bg-ok" />
                           Live
                         </span>
-                      ) : m.hasMinutes ? (
-                        <span>Minutes written</span>
+                      ) : m.postedWrapUp ? (
+                        <span>{POSTED_LABEL[m.postedWrapUp]}</span>
                       ) : null}
-                      {(m.live || m.hasMinutes) && <span aria-hidden>·</span>}
+                      {(m.live || m.postedWrapUp) && <span aria-hidden>·</span>}
                       <span>
                         {m.seatCount} seat{m.seatCount === 1 ? "" : "s"}
                       </span>

@@ -10,6 +10,7 @@ import { FakeLlm, LlmError } from "../test/fake-llm.js";
 import { FakeTools, SEARCH_URLS } from "../test/fake-tools.js";
 import { Engine, EngineError } from "./engine.js";
 import { EventHub } from "./hub.js";
+import { ALREADY_DONE } from "./tools.js";
 
 const store = createStore(db);
 
@@ -783,6 +784,42 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         expect(research).toContain("web_search: q1");
         expect(research).toContain("web_search: q6");
         expect((await lastMessage(w)).content).toBe("From what I found.");
+      });
+
+      it("doesn't run the same search or page twice in a turn, or count it against the limit", async () => {
+        const w = await world();
+        await enable(w.gpt);
+        w.llm.on(
+          w.gpt.model,
+          { chunks: [], toolCalls: [toolCall("web_search", { query: "gold price" }, "s1")] },
+          { chunks: [], toolCalls: [toolCall("web_fetch", { url: SEARCH_URLS[0] }, "f1")] },
+          {
+            chunks: [],
+            // The same page (a fragment never reaches the server) and the same search, worded the same.
+            toolCalls: [
+              toolCall("web_fetch", { url: `${SEARCH_URLS[0]}#prices` }, "f2"),
+              toolCall("web_search", { query: " Gold Price" }, "s2"),
+            ],
+          },
+          { chunks: ["Gold is up."] },
+        );
+        await ask(w, w.gpt);
+        await w.engine.waitIdle(w.meeting.id);
+
+        expect(w.tools.calls.map((c) => c.name)).toEqual(["web_search", "web_fetch"]);
+        const turns = w.llm.callsFor(w.gpt.model);
+        expect(turns).toHaveLength(4);
+        // Each repeat still gets an answer, or the provider refuses the next request.
+        const repeats = (turns[3]?.messages ?? []).filter((m) => m.role === "tool").slice(-2);
+        expect(repeats.map((m) => m.content)).toEqual([ALREADY_DONE, ALREADY_DONE]);
+        // Not counted: tools are still on offer, not the forced final answer.
+        expect(turns[3]?.tools).toBeDefined();
+        const msg = await lastMessage(w);
+        expect(msg.toolCalls.map((c) => `${c.tool} ${c.input}`)).toEqual([
+          "web_search gold price",
+          `web_fetch ${SEARCH_URLS[0]}`,
+        ]);
+        expect(msg.content).toBe("Gold is up.");
       });
 
       it("answers every call in a batch that goes over the limit, but doesn't run the extras", async () => {

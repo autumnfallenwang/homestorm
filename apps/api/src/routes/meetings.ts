@@ -23,7 +23,7 @@
 
 import {
   AddSeatInput,
-  type AnswerLength,
+  ANSWER_LENGTH_LABEL,
   type ContextBudget,
   CreateMeetingInput,
   type Limits,
@@ -39,7 +39,7 @@ import {
   UpdateMeetingInput,
   UpdateSeatInput,
   uniqueSeatName,
-  type WebAccess,
+  WEB_ACCESS_LABEL,
   WrapUpInput,
 } from "@homestorm/shared";
 import { type Context, Hono } from "hono";
@@ -80,13 +80,8 @@ function fail(c: Ctx, err: unknown): Response {
   throw err;
 }
 
-const WEB_LABEL: Record<WebAccess, string> = {
-  off: "Off",
-  on: "Can search",
-  must: "Must search first",
-};
-
-const LENGTH_LABEL: Record<AnswerLength, string> = { concise: "Concise", detailed: "Detailed" };
+const WEB_LABEL = WEB_ACCESS_LABEL;
+const LENGTH_LABEL = ANSWER_LENGTH_LABEL;
 const BUDGET_LABEL: Record<ContextBudget, string> = {
   small: "Small",
   standard: "Standard",

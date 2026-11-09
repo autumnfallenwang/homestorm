@@ -1,6 +1,7 @@
 import type { Message, Seat } from "@homestorm/shared";
 import { describe, expect, it } from "vitest";
 import {
+  CONCISE_REMINDER,
   CUT_OFF_NOTE,
   MEETING_STARTED,
   REPLY_EXCERPT_CHARS,
@@ -126,7 +127,7 @@ describe("buildView: roles and tags", () => {
         "[GPT-6 Luna]: In the API.",
         "[DeepSeek V4 Pro]: Both.",
         "[Chair → you]: Claude, respond to GPT's point.",
-        "[Floor] The Chair asks you to speak now.",
+        `[Floor] The Chair asks you to speak now. ${CONCISE_REMINDER}`,
       ].join("\n\n"),
     );
   });
@@ -189,7 +190,7 @@ describe("buildView: roles and tags", () => {
     const v = view([chair("Q"), said(claude, "A.")], claude, { floor: { kind: "direct" } });
     expect(v.messages.at(-1)).toEqual({
       role: "user",
-      content: "[Floor] The Chair asks you to speak now.",
+      content: `[Floor] The Chair asks you to speak now. ${CONCISE_REMINDER}`,
     });
     expect(v.messages.at(-2)?.role).toBe("assistant");
   });
@@ -296,7 +297,7 @@ describe("buildView: the meeting brief", () => {
     expect(after.messages[0]?.content).not.toContain("Facts v1");
     // Set before the discussion: no line. Changed after it started: one line where it happened.
     expect(after.messages[1]?.content).toBe(
-      "[Chair]: Edge or API?\n\n(The Chair updated the meeting brief. Your instructions have the current version.)\n\n[Floor] All 3 participants answer this independently: you can't see the others' answers and they can't see yours. Give your own view.",
+      `[Chair]: Edge or API?\n\n(The Chair updated the meeting brief. Your instructions have the current version.)\n\n[Floor] All 3 participants answer this independently: you can't see the others' answers and they can't see yours. Give your own view. ${CONCISE_REMINDER}`,
     );
   });
 
@@ -374,7 +375,7 @@ describe("buildView: visibility", () => {
     // DeepSeek's view after GPT finished, then after Claude finished: the first is a prefix of the second.
     const early = view(all, ds, { cutoffSeq: 2, floor: { kind: "direct" } });
     const late = view(all, ds, { cutoffSeq: 3, floor: { kind: "direct" } });
-    const floor = "\n\n[Floor] The Chair asks you to speak now.";
+    const floor = `\n\n[Floor] The Chair asks you to speak now. ${CONCISE_REMINDER}`;
     const earlyBody = early.messages
       .map((m) => m.content)
       .join("\n\n")
@@ -445,7 +446,10 @@ describe("buildView: trimming", () => {
     const own = view([chair("Q")], scribe, { seats: [claude, gpt, scribe] });
     expect(own.messages[0]?.content).toContain("Answer thoroughly");
     const other = view([chair("Q")], claude, { seats: [claude, gpt, scribe] });
-    expect(other.messages[0]?.content).toContain("Keep answers concise");
+    expect(other.messages[0]?.content).toContain("Keep answers concise: about 150 to 250 words");
+    // The reminder ends the floor note, the last thing before the answer, for the Concise seat only.
+    expect(String(other.messages.at(-1)?.content)).toContain(CONCISE_REMINDER);
+    expect(String(own.messages.at(-1)?.content)).not.toContain(CONCISE_REMINDER);
   });
 
   it("trims nothing when the meeting fits", () => {
@@ -517,6 +521,18 @@ describe("renderFloorNote", () => {
     );
     expect(renderFloorNote({ kind: "wrap_up", wrapKind: "open_questions" })).toContain(
       "List the open questions",
+    );
+  });
+
+  it("reminds a Concise seat of the length last, but not a Detailed one or a wrap-up", () => {
+    expect(renderFloorNote({ kind: "direct" }, "concise")).toBe(
+      `[Floor] The Chair asks you to speak now. ${CONCISE_REMINDER}`,
+    );
+    expect(renderFloorNote({ kind: "direct" }, "detailed")).toBe(
+      "[Floor] The Chair asks you to speak now.",
+    );
+    expect(renderFloorNote({ kind: "wrap_up", wrapKind: "minutes" }, "concise")).not.toContain(
+      CONCISE_REMINDER,
     );
   });
 

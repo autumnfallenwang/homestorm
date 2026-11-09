@@ -6,6 +6,20 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-08
 
+- **Fixes from the full meeting test** (below):
+  - **`~` isn't strikethrough any more.** Only `~~double~~` is (`singleTilde: false` in `markdown.tsx`), so "~$350
+    (~$25/TB)" reads as written.
+  - **A repeated tool call isn't run.** The same search or page again in one turn (URLs compared without the
+    fragment) gets "you already made this exact call" and doesn't count against the 6 calls. The record and the export
+    list each search and page once, which also tidies older turns (`distinctToolCalls`).
+  - **The meetings list** says "Minutes posted", "Decision posted" or "Open questions posted" for the latest posted
+    wrap-up (a draft doesn't count), and refreshes when seats change or a wrap-up is posted, not only with rounds.
+  - **The export** opens with the room rules, and a seat's notes give only its own settings, in the UI's words
+    ("web tools: Must search first"). The labels now live in `packages/shared/src/names.ts`.
+  - **Settings → Back to meetings** returns to the meeting this tab came from (`sessionStorage`, only `/` or
+    `/m/<id>`).
+  - **Concise** asks for about 150 to 250 words, and the floor note ends with the same reminder (ADR 0012).
+
 - **Message cost from llmgw 0.8.0.** llmgw priced every reply but only logged it, so every message's cost was empty.
   llmgw 0.8.0 adds `cost_usd` to `usage` and returns its own `req_id` in `X-Request-Id`, logging ours as `request_id`.
   homestorm already read both. llmgw's figure for Claude and GPT is a list-price equivalent, not money paid, so a new

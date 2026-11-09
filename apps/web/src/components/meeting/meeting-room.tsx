@@ -48,11 +48,18 @@ export function MeetingRoom({ id }: { id: string }) {
     hadBrief.current = hasBrief;
   }, [state, hasBrief]);
 
-  // Keep the sidebar's live / minutes badges in step with rounds starting and ending.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: roundKey is the trigger
+  // Keep the meetings list in step: Live while a round runs, the seat count, and the latest posted wrap-up. Seats
+  // used to change without it, so the list said "2 seats" with four at the table.
+  const listKey = state
+    ? [
+        roundKey,
+        state.seats.filter((s) => !s.removedAt).map((s) => s.id),
+        state.messages.filter((m) => m.wrapKind && !m.hiddenFromSeats).map((m) => m.id),
+      ].join("|")
+    : "";
   useEffect(() => {
-    if (roundKey) void refresh();
-  }, [roundKey, refresh]);
+    if (listKey) void refresh();
+  }, [listKey, refresh]);
 
   useEffect(() => {
     if (!notice) return;

@@ -187,7 +187,7 @@ export function buildView(input: ViewInput): View {
     answerLength: seatAnswerLength(seat, input.meeting),
     brief: briefText,
   });
-  const floor = renderFloorNote(input.floor);
+  const floor = renderFloorNote(input.floor, seatAnswerLength(seat, input.meeting));
 
   const items: Item[] = [];
   const briefImages = briefMessage ? imagesOf(briefMessage) : [];

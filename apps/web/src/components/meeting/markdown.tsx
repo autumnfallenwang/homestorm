@@ -2,7 +2,7 @@
 
 import { cutAtCjkPunctuation } from "@homestorm/shared";
 import { memo } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Options } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,15 @@ function remarkEndBareLinks() {
  * and the browser would send that with no click at all, getting around the rule on which URLs seats may read. So an
  * image shows as its description.
  */
+/**
+ * GFM, but only `~~double~~` is strikethrough. Models write "~" for "about" ("~$350 (~$25/TB)"), and with GFM's
+ * default a second "~" in the same paragraph struck through everything between them (found in a cluster meeting).
+ */
+const GFM_PLUGINS: NonNullable<Options["remarkPlugins"]> = [
+  [remarkGfm, { singleTilde: false }],
+  remarkEndBareLinks,
+];
+
 export const Markdown = memo(function Markdown({
   text,
   streaming = false,
@@ -58,7 +67,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className={cn("prose-msg text-sm", streaming && "stream-cursor")}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkEndBareLinks]}
+        remarkPlugins={GFM_PLUGINS}
         rehypePlugins={streaming ? [] : [[rehypeHighlight, { detect: false }]]}
         components={{
           a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,

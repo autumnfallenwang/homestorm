@@ -48,7 +48,9 @@ import type { EventHub } from "./hub.js";
 import type { Floor, ReplyTarget } from "./prompts.js";
 import { displayTokens } from "./tokens.js";
 import {
+  ALREADY_DONE,
   allowedUrls,
+  callKey,
   canonicalUrl,
   FORCED_SEARCH,
   LIMIT_REACHED,
@@ -899,6 +901,8 @@ export class Engine {
       const messages: ChatTurn["messages"] = [...view.messages];
       const research: string[] = [];
       let callsLeft = MAX_TOOL_CALLS_PER_TURN;
+      // Calls already made this turn, whatever came of them: the same one again gets the same answer.
+      const made = new Set<string>();
       let completionTokens = 0;
       let costUsd: number | null = null;
       for (let step = 0; ; step++) {
@@ -977,12 +981,30 @@ export class Engine {
 
         for (const call of toolCalls) {
           // Every call needs a result, or the provider refuses the next request.
+          const read = readToolCall(call);
+          const key = callKey(read.tool, read.input);
+          if (made.has(key)) {
+            // Not run and not counted: its result is already in the conversation.
+            messages.push({ role: "tool", tool_call_id: call.id, content: ALREADY_DONE });
+            log.info(
+              {
+                event: "turn.tool",
+                ...fields,
+                request_id: requestId,
+                tool: read.tool,
+                status: "repeated",
+                calls_left: callsLeft,
+              },
+              "seat used a tool",
+            );
+            continue;
+          }
           if (callsLeft <= 0) {
             messages.push({ role: "tool", tool_call_id: call.id, content: LIMIT_REACHED });
             continue;
           }
           callsLeft--;
-          const read = readToolCall(call);
+          made.add(key);
           activity.push({ tool: read.tool, input: read.input, status: "running" });
           await this.patch(msg, { content: "", toolCalls: [...activity] });
 

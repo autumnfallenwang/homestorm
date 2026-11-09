@@ -47,7 +47,9 @@ llmgw facts, checked 2026-11-02:
 
 **Answer length is a room rule, *Concise* (default) or *Detailed*.**
 
-- **Concise:** the intro asks for short answers, with 2,048 tokens of room for the answer.
+- **Concise:** the intro asks for about 150 to 250 words, with 2,048 tokens of room for the answer, and the floor
+  note ends with the same reminder, the last thing before the answer (2026-11-08: under the old "a few short
+  paragraphs", Claude and DeepSeek Flash wrote about 3,500 characters in a cluster meeting).
 - **Detailed:** the intro asks for thorough answers, with 8,192 tokens of room for the answer.
 - For GPT, which ignores `max_tokens`, the instruction is all there is.
 

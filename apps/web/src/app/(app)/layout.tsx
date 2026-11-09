@@ -1,11 +1,13 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { usePathname } from "next/navigation";
+import { type ReactNode, useEffect, useState } from "react";
 import { SessionGate } from "@/components/auth/session-gate";
 import { MeetingsProvider } from "@/components/shell/meetings-context";
 import { MeetingsRail, MeetingsSidebar } from "@/components/shell/meetings-sidebar";
 import { Button } from "@/components/ui/button";
+import { rememberMeetingsPage } from "@/lib/back-to-meetings";
 import { useStoredFlag } from "@/lib/stored-flag";
 
 /** The three-pane shell (ADR 0007): meetings list on the left; each page fills the middle and right. */
@@ -13,6 +15,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Wide screens can fold the meetings list into a narrow rail; this browser remembers it.
   const [folded, setFolded] = useStoredFlag("homestorm.meetings-folded");
+  // So Settings' "Back to meetings" returns to this page.
+  const pathname = usePathname();
+  useEffect(() => rememberMeetingsPage(pathname), [pathname]);
   return (
     <SessionGate>
       <MeetingsProvider>

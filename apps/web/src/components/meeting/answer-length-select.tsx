@@ -1,6 +1,6 @@
 "use client";
 
-import type { AnswerLength } from "@homestorm/shared";
+import { ANSWER_LENGTH_LABEL, type AnswerLength } from "@homestorm/shared";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,10 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const LENGTH_LABEL: Record<AnswerLength, string> = {
-  concise: "Concise",
-  detailed: "Detailed",
-};
+export const LENGTH_LABEL = ANSWER_LENGTH_LABEL;
 
 /**
  * A seat's answer length (ADR 0012): the room rule by default, or its own. null means "follow the room rule", and

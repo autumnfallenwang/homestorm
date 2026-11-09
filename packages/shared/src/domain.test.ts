@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { seatAnswerLength, seatWebAccess } from "./domain.js";
+import { seatAnswerLength, seatWebAccess, toolSummary } from "./domain.js";
 
 describe("seatAnswerLength", () => {
   it("follows the room rule unless the seat has its own", () => {
@@ -20,5 +20,19 @@ describe("seatWebAccess", () => {
     expect(seatWebAccess({ webAccess: null }, { webAccess: "must" })).toBe("must");
     expect(seatWebAccess({ webAccess: "on" }, { webAccess: "off" })).toBe("on");
     expect(seatWebAccess({ webAccess: "off" }, { webAccess: "on" })).toBe("off");
+  });
+});
+
+describe("toolSummary", () => {
+  it("lists each search and page once, even from a turn that repeated one", () => {
+    const page = "https://a.example/burn-in";
+    expect(
+      toolSummary([
+        { tool: "web_search", input: "burn-in 16TB", status: "ok", urls: [page] },
+        { tool: "web_fetch", input: "https://b.example/x", status: "failed", detail: "HTTP 403" },
+        { tool: "web_fetch", input: page, status: "ok" },
+        { tool: "web_fetch", input: page, status: "ok" },
+      ]),
+    ).toBe(`Searched: "burn-in 16TB" · Read: ${page}`);
   });
 });

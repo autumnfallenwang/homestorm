@@ -1,6 +1,6 @@
 "use client";
 
-import type { WebAccess } from "@homestorm/shared";
+import { WEB_ACCESS_LABEL, type WebAccess } from "@homestorm/shared";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -11,11 +11,7 @@ import {
 } from "@/components/ui/select";
 
 /** Short names, for the room rule and the "Room rule (now …)" option. */
-export const WEB_LABEL: Record<WebAccess, string> = {
-  off: "Off",
-  on: "Can search",
-  must: "Must search first",
-};
+export const WEB_LABEL = WEB_ACCESS_LABEL;
 
 /** What the seat card says when a seat has its own setting. */
 export const WEB_CARD_LABEL: Record<WebAccess, string> = {

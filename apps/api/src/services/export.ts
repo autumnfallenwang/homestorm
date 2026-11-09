@@ -1,16 +1,17 @@
 // A meeting as Markdown (v1 scope, ADR 0009): seats, then the transcript in order, rounds as headings.
 
 import {
+  ANSWER_LENGTH_LABEL,
   type AttachmentMeta,
   briefAt,
   type MeetingState,
   type Message,
   type Round,
   type Seat,
-  seatWebAccess,
   sourceLabel,
   spendUsd,
   toolSummary,
+  WEB_ACCESS_LABEL,
 } from "@homestorm/shared";
 
 const MODE_LABEL: Record<Round["mode"], string> = {
@@ -52,7 +53,14 @@ export function exportMarkdown(
     "",
     `Exported from homestorm on ${now.toISOString().slice(0, 10)}. Meeting started ${meeting.createdAt.slice(0, 10)}.`,
     "",
+    "## Room rules",
+    "",
+    `- Answer length: ${ANSWER_LENGTH_LABEL[meeting.answerLength]}`,
+    `- Web tools: ${WEB_ACCESS_LABEL[meeting.webAccess]}`,
+    "",
     "## Seats",
+    "",
+    "A seat follows the room rules unless its notes give its own setting.",
     "",
     "| Seat | Model | Source | Notes |",
     "|---|---|---|---|",
@@ -60,9 +68,9 @@ export function exportMarkdown(
       const notes = [
         s.removedAt ? "left the meeting" : "",
         s.muted ? "muted" : "",
-        s.answerLength ? `answers: ${s.answerLength}` : "",
+        s.answerLength ? `answers: ${ANSWER_LENGTH_LABEL[s.answerLength]}` : "",
         s.contextBudget && s.contextBudget !== "standard" ? `context: ${s.contextBudget}` : "",
-        seatWebAccess(s, meeting) !== "off" ? `web tools: ${seatWebAccess(s, meeting)}` : "",
+        s.webAccess ? `web tools: ${WEB_ACCESS_LABEL[s.webAccess]}` : "",
         s.persona ? `persona: ${oneLine(s.persona)}` : "",
       ]
         .filter(Boolean)

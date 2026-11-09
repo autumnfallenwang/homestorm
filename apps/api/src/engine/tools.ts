@@ -21,6 +21,10 @@ export const URL_REFUSED =
 export const LIMIT_REACHED =
   "This call wasn't run: the limit for this turn was reached. Answer from what you have.";
 
+/** A second identical call in one turn isn't run: a seat fetched the same page twice in a cluster meeting. */
+export const ALREADY_DONE =
+  "This call wasn't run: you already made this exact call in this turn, and its result is above. Use that result, or try a different search or page.";
+
 const URL_IN_TEXT = /https?:\/\/[^\s<>"'`\]]+/gi;
 
 /** The form URLs are compared in. A fragment never reaches the server, so it doesn't matter. */
@@ -33,6 +37,13 @@ export function canonicalUrl(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** What makes two calls in a turn the same: the tool and its input, with URLs compared in canonical form. */
+export function callKey(tool: string, input: string): string {
+  const same =
+    tool === "web_fetch" ? (canonicalUrl(input) ?? input.trim()) : input.trim().toLowerCase();
+  return `${tool} ${same}`;
 }
 
 /** Sentence punctuation and a closing bracket aren't part of a link, unless the link opened that bracket itself. */

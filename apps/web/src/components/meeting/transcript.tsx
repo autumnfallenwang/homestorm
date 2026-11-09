@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  distinctToolCalls,
   type Message,
   type Round,
   spendUsd,
@@ -339,7 +340,7 @@ function ToolCalls({ calls }: { calls: ToolActivity[] }) {
   if (!calls.length) return null;
   return (
     <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground" aria-label="Web tools used">
-      {calls.map((call, i) => (
+      {distinctToolCalls(calls).map((call, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a turn's calls only ever grow at the end
         <li key={i} className="flex min-w-0 items-start gap-1.5">
           <Globe className="mt-0.5 size-3 shrink-0" />
