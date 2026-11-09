@@ -138,7 +138,11 @@ const STATUS_TONE: Record<string, string> = {
 /** A seat's own settings, where it differs from the defaults and the room rules: "effort high · no web tools". */
 function ownSettings(seat: Seat): string[] {
   return [
-    seat.reasoningEffort !== "low" ? `effort ${seat.reasoningEffort}` : "",
+    seat.reasoningEffort === "off"
+      ? "thinking off"
+      : seat.reasoningEffort !== "low"
+        ? `effort ${seat.reasoningEffort}`
+        : "",
     seat.answerLength ? `${LENGTH_LABEL[seat.answerLength]} answers` : "",
     seat.contextBudget && seat.contextBudget !== "standard"
       ? `${BUDGET_LABEL[seat.contextBudget]} context`
