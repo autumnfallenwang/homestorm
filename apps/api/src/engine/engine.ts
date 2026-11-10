@@ -878,6 +878,7 @@ export class Engine {
     const view = buildView({
       webTools: offered.has("web_search"),
       codeRun: offered.has("code_run"),
+      mustCheck: web === "must" && offered.has("web_search"),
       meeting: state.meeting,
       seats: state.seats,
       messages: state.messages,
@@ -961,6 +962,9 @@ export class Engine {
       const made = new Set<string>();
       let completionTokens = 0;
       let costUsd: number | null = null;
+      const mustCheck = web === "must" && offered.has("web_search");
+      let forceSearch = false;
+      let forced = false;
       for (let step = 0; ; step++) {
         const offer = tools && callsLeft > 0;
         const stepMessages: ChatTurn["messages"] =
@@ -982,7 +986,7 @@ export class Engine {
             ? {
                 tools: tools ?? [],
                 toolChoice:
-                  step === 0 && web === "must" && offered.has("web_search")
+                  forceSearch || (step === 0 && mustCheck && !offered.has("code_run"))
                     ? FORCED_SEARCH
                     : ("auto" as const),
               }
@@ -1022,6 +1026,17 @@ export class Engine {
           }
         }
         if (ac.signal.aborted) break;
+        // Must search first, with Python offered (2026-11-10): the seat picks its first tool, so a sum needs no search
+        // ("calculator", on the cluster). Answering with no tool at all isn't allowed: that answer goes, and a
+        // search is forced, as it is from the start when Python isn't offered.
+        if (offer && !toolCalls.length && mustCheck && !activity.length && !forced) {
+          forceSearch = forced = true;
+          text = "";
+          this.live.set(messageId, "");
+          this.emit(meetingId, { type: "text_reset", messageId });
+          continue;
+        }
+        forceSearch = false;
         if (!offer || !toolCalls.length) break;
 
         // Text before a tool call is only leading up to it ("I'll check…"). The answer is what comes after.

@@ -564,6 +564,11 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       name: "code_run",
       arguments: JSON.stringify({ code }),
     });
+    const search = (query: string) => ({
+      id: "s-1",
+      name: "web_search",
+      arguments: JSON.stringify({ query }),
+    });
     const pythonOn = (w: World) => store.updateMeeting(w.meeting.id, { codeAccess: "on" });
     const names = (w: World, model: string, i = 0) =>
       w.llm.callsFor(model)[i]?.tools?.map((t) => t.function.name) ?? null;
@@ -623,20 +628,59 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       );
     });
 
-    it("keeps must-search forcing a search first, with Python offered too", async () => {
+    it("lets a must-search seat with Python run a sum first, with no forced search", async () => {
       const w = await world();
       await pythonOn(w);
       await store.updateSeat(w.gpt.id, { webAccess: "must" });
+      w.llm.on(
+        w.gpt.model,
+        { chunks: [], toolCalls: [run("print(1236 * 1.0625)")] },
+        { chunks: ["$1,313.25."] },
+      );
       await w.engine.send(w.meeting.id, {
-        text: "Q",
+        text: "Total?",
         mode: "blind",
         targets: [w.gpt.id],
         replyTo: null,
       });
       await w.engine.waitIdle(w.meeting.id);
-      const turn = w.llm.callsFor(w.gpt.model)[0];
-      expect(turn?.toolChoice).toEqual({ type: "function", function: { name: "web_search" } });
-      expect(names(w, w.gpt.model)).toContain("code_run");
+      const turns = w.llm.callsFor(w.gpt.model);
+      expect(turns[0]?.toolChoice).toBe("auto");
+      expect(String(turns[0]?.messages[0]?.content)).toContain(
+        "Before you answer, check with a tool: search for facts, or run Python for sums.",
+      );
+      expect(w.tools.calls.map((c) => c.name)).toEqual(["code_run"]);
+      expect((await seatMessages(w.meeting.id)).at(-1)?.content).toBe("$1,313.25.");
+    });
+
+    it("but a must-search seat that answers with no tool loses that answer, and must search", async () => {
+      const w = await world();
+      await pythonOn(w);
+      await store.updateSeat(w.gpt.id, { webAccess: "must" });
+      w.llm.on(
+        w.gpt.model,
+        { chunks: ["From memory: gold is $2,000."] },
+        { chunks: [], toolCalls: [search("gold price")] },
+        { chunks: ["Checked: gold is $1,234.56."] },
+      );
+      await w.engine.send(w.meeting.id, {
+        text: "Gold?",
+        mode: "blind",
+        targets: [w.gpt.id],
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+      const turns = w.llm.callsFor(w.gpt.model);
+      expect(turns.map((t) => t.toolChoice)).toEqual([
+        "auto",
+        { type: "function", function: { name: "web_search" } },
+        "auto",
+      ]);
+      // The answer from memory never entered the conversation, and the reader saw it cleared.
+      expect(turns[1]?.messages.some((m) => String(m.content).includes("From memory"))).toBe(false);
+      const msg = (await seatMessages(w.meeting.id)).at(-1);
+      expect(msg?.content).toBe("Checked: gold is $1,234.56.");
+      expect(w.events.some((e) => e.type === "text_reset" && e.messageId === msg?.id)).toBe(true);
     });
 
     it("records a Python error by its last line, for the seat to fix", async () => {
@@ -1093,6 +1137,9 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       const turns = w.llm.callsFor(w.claude.model);
       expect(turns[0]?.toolChoice).toEqual({ type: "function", function: { name: "web_search" } });
       expect(turns[1]?.toolChoice).toBe("auto");
+      expect(String(turns[0]?.messages[0]?.content)).toContain(
+        "Before you answer, search the web. Don't answer from memory alone.",
+      );
     });
 
     it("no tools in a poll: it asks what a seat thinks now", async () => {

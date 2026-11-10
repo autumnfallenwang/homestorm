@@ -24,6 +24,8 @@ export interface IntroInput {
   webTools?: boolean;
   /** This seat is being offered code_run this turn (ADR 0021). */
   codeRun?: boolean;
+  /** The seat must check with a tool before answering ("Must search first", ADR 0014). */
+  mustCheck?: boolean;
 }
 
 const LENGTH_RULE: Record<AnswerLength, string> = {
@@ -70,7 +72,8 @@ export function renderIntro(input: IntroInput): string {
     "- The Chair wants independent views. Disagree when you have a reason, including with the Chair.",
     "- Speak only for yourself. Never write lines for other participants or for the Chair.",
     '- Don\'t start your reply with your name or a "[Name]:" tag.',
-    "- Use Markdown when it helps.",
+    // Plain-text maths (2026-11-10): homestorm renders Markdown, not LaTeX, and GPT wrote `\mathbf{$1,313.25}`.
+    "- Use Markdown when it helps, but no LaTeX: write maths as plain text, like $1,236 × 1.0625 = $1,313.25.",
   ];
   if (input.webTools) {
     lines.push(
@@ -95,6 +98,13 @@ export function renderIntro(input: IntroInput): string {
     lines.push(
       "",
       "Tool calls:",
+      ...(input.webTools && input.mustCheck
+        ? [
+            input.codeRun
+              ? "- Before you answer, check with a tool: search for facts, or run Python for sums. Don't answer from memory alone."
+              : "- Before you answer, search the web. Don't answer from memory alone.",
+          ]
+        : []),
       `- Up to ${MAX_TOOL_CALLS_PER_TURN} this turn${input.webTools && input.codeRun ? ", searches, page reads and code runs together" : ""}. Stop once you can answer; every call makes the answer slower.`,
     );
   }

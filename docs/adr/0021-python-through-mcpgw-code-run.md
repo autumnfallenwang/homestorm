@@ -27,7 +27,12 @@ use.**
 - **The prompt:** a Python section (use it for arithmetic, totals, conversions and comparisons instead of working
   them out in your head; put the numbers in the code; give the result, not the code). The 6 calls a turn are shared
   with searches and page reads, and each result says how many are left.
-- **"Must search first"** still forces a search as the first call; Python is offered alongside.
+- **"Must search first" with Python** (changed the same day, after a live test where a seat searched "calculator"
+  before a sum): the seat picks its first tool, search for facts or Python for sums, and is told to check with a
+  tool before answering. An answer with no tool at all is thrown away and a search is forced, so it never answers
+  from memory alone. Without Python, the first call is a forced search as before.
+- **Plain-text maths:** the intro asks for maths as plain text, not LaTeX, which homestorm doesn't render (GPT-6 Luna
+  wrote `\mathbf{$1,313.25}`).
 - **The record:** each run keeps its code and up to 2,000 characters of what it printed (the seat itself reads up to
   mcpgw's 16,000). Under the answer it shows as "Ran Python (3 lines)", opening to the code and the output. A Python
   error shows in amber with its last line ("ZeroDivisionError: division by zero"); the seat read the whole error and

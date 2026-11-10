@@ -492,6 +492,7 @@ describe("renderIntro", () => {
     expect(intro).toContain('Don\'t start your reply with your name or a "[Name]:" tag.');
     expect(intro).toContain('("I agree with GPT-6 Luna")');
     expect(intro).toContain("Keep answers concise");
+    expect(intro).toContain("no LaTeX: write maths as plain text");
   });
 
   it("appends the persona last", () => {

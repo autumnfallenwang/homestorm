@@ -83,6 +83,8 @@ export interface ViewInput {
   webTools?: boolean;
   /** This seat is offered code_run this turn (ADR 0021). */
   codeRun?: boolean;
+  /** It must check with a tool before answering ("Must search first"). */
+  mustCheck?: boolean;
 }
 
 export interface View {
@@ -184,6 +186,7 @@ export function buildView(input: ViewInput): View {
     today: input.today ?? new Date().toISOString().slice(0, 10),
     webTools: input.webTools ?? false,
     codeRun: input.codeRun ?? false,
+    mustCheck: input.mustCheck ?? false,
     meetingTitle: input.meeting.title,
     self: { displayName: seat.displayName, model: seat.model, persona: seat.persona },
     roster,

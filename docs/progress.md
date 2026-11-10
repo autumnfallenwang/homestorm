@@ -6,6 +6,13 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ## 2026-11-10
 
+- **Two fixes from the Python test:**
+  - **Plain-text maths:** the intro now says "no LaTeX: write maths as plain text", since GPT-6 Luna's
+    `\mathbf{$1,313.25}` showed raw.
+  - **Must search first, with Python:** the seat picks its first tool, so a sum goes straight to Python. Answering with
+    no tool at all still isn't allowed: that answer is dropped (the reader sees it cleared) and a search is forced.
+    Without Python nothing changes. 2 new tests.
+
 - **Python for seats** ([ADR 0021](adr/0021-python-through-mcpgw-code-run.md)), using mcpgw's new `code_run`.
   - **A bug first:** homestorm offered seats with web tools mcpgw's whole tool list, which gained `code_run` on
     2026-11-10, but couldn't run it and didn't mention it. Now a seat is offered exactly what it may use, from what
