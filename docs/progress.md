@@ -18,6 +18,11 @@ A dated log of what was done and decided, newest first. The plan and milestone s
     with its last line. Other seats see "Ran Python twice". The export has each run's code and output.
   - **Checked:** 11 new tests (offered per seat, never an unknown tool, must-search still first, the run and its
     output recorded, a Python error, none in a poll, the room rule and its events, the export).
+  - **Deployed as `71432c7`** (migration 0010 ran; the test meeting showed Python: On) and checked with all four
+    seats on a sum with tax, an upload time and a price per TB: every seat ran Python once and got $1,313.25, 13.9 days
+    and $27.36 per usable TB, in 7 to 17 s. The run shows under each answer and opens to the code and output.
+  - **Seen:** GPT-6 Luna wrote its maths as LaTeX (`\mathbf{$1,313.25}`), which homestorm shows raw; and "must search
+    first" made it search "calculator" before a pure sum.
 
 ## 2026-11-09
 
