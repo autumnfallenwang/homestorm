@@ -12,6 +12,9 @@ A dated log of what was done and decided, newest first. The plan and milestone s
   - **Must search first, with Python:** the seat picks its first tool, so a sum goes straight to Python. Answering with
     no tool at all still isn't allowed: that answer is dropped (the reader sees it cleared) and a search is forced.
     Without Python nothing changes. 2 new tests.
+  - **Deployed as `372cc40` and checked on GPT-6 Luna** (must search, Python on): a pure sum went straight to Python,
+    5 s, right ($786.22, $213.78 left), with no LaTeX; a question about B2's price still searched and read Backblaze's
+    own page.
 
 - **Python for seats** ([ADR 0021](adr/0021-python-through-mcpgw-code-run.md)), using mcpgw's new `code_run`.
   - **A bug first:** homestorm offered seats with web tools mcpgw's whole tool list, which gained `code_run` on
