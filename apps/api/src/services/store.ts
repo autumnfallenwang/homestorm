@@ -5,6 +5,7 @@ import type {
   AnswerLength,
   AttachmentMeta,
   AuthorKind,
+  CodeAccess,
   ContextBudget,
   Meeting,
   MeetingState,
@@ -74,6 +75,7 @@ export function toMeeting(r: MeetingRow): Meeting {
     title: r.title,
     answerLength: r.answerLength as AnswerLength,
     webAccess: r.webAccess as WebAccess,
+    codeAccess: r.codeAccess as CodeAccess,
     clock: r.clock,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -94,6 +96,7 @@ export function toSeat(r: SeatRow): Seat {
     answerLength: r.answerLength as AnswerLength | null,
     contextBudget: r.contextBudget as ContextBudget | null,
     webAccess: r.webAccess as WebAccess | null,
+    codeAccess: r.codeAccess as CodeAccess | null,
     removedAt: iso(r.removedAt),
     createdAt: r.createdAt.toISOString(),
   };
@@ -189,7 +192,7 @@ export function createStore(db: Database) {
 
     async updateMeeting(
       id: string,
-      patch: Partial<Pick<MeetingRow, "title" | "answerLength" | "webAccess">>,
+      patch: Partial<Pick<MeetingRow, "title" | "answerLength" | "webAccess" | "codeAccess">>,
     ): Promise<Meeting | null> {
       const [row] = await db
         .update(meetings)
@@ -264,6 +267,7 @@ export function createStore(db: Database) {
       answerLength?: AnswerLength | null;
       contextBudget?: ContextBudget | null;
       webAccess?: WebAccess | null;
+      codeAccess?: CodeAccess | null;
     }): Promise<Seat> {
       const [max] = await db
         .select({ value: sql<number>`coalesce(max(${seats.position}), -1)::int` })
@@ -315,6 +319,7 @@ export function createStore(db: Database) {
           | "answerLength"
           | "contextBudget"
           | "webAccess"
+          | "codeAccess"
           | "position"
           | "removedAt"
         >

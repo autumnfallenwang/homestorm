@@ -109,3 +109,4 @@ Account-specific details (plans, balances, how llmgw signs in to each provider) 
 | [0018](docs/adr/0018-settings-profile-and-appearance.md) | Settings, after homework's: Profile (name, email, password) and Appearance (palette, light or dark, size, per browser) |
 | [0019](docs/adr/0019-pdf-and-word-files-read-in-the-browser.md) | PDF and Word files read into text in the browser, in a Web Worker; the server never parses them |
 | [0020](docs/adr/0020-polls.md) | Polls: every seat answers one question privately in one line (choice, confidence, why), shown as a tally and a table |
+| [0021](docs/adr/0021-python-through-mcpgw-code-run.md) | Python for seats through mcpgw's code_run: a room rule like web tools, on by default; only the tools a seat may use are offered |

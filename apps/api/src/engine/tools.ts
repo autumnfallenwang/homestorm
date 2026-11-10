@@ -27,13 +27,13 @@ export const LIMIT_REACHED =
  */
 export function callsLeftNote(left: number): string {
   return left > 0
-    ? `(${left} web call${left === 1 ? "" : "s"} left this turn.)`
-    : "(No web calls left this turn: answer now from what you have.)";
+    ? `(${left} tool call${left === 1 ? "" : "s"} left this turn.)`
+    : "(No tool calls left this turn: answer now from what you have.)";
 }
 
 /** A second identical call in one turn isn't run: a seat fetched the same page twice in a cluster meeting. */
 export const ALREADY_DONE =
-  "This call wasn't run: you already made this exact call in this turn, and its result is above. Use that result, or try a different search or page.";
+  "This call wasn't run: you already made this exact call in this turn, and its result is above. Use that result, or try something different.";
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"'`\]]+/gi;
 
@@ -52,7 +52,11 @@ export function canonicalUrl(raw: string): string | null {
 /** What makes two calls in a turn the same: the tool and its input, with URLs compared in canonical form. */
 export function callKey(tool: string, input: string): string {
   const same =
-    tool === "web_fetch" ? (canonicalUrl(input) ?? input.trim()) : input.trim().toLowerCase();
+    tool === "web_fetch"
+      ? (canonicalUrl(input) ?? input.trim())
+      : tool === "code_run"
+        ? input.trim() // case matters in code
+        : input.trim().toLowerCase();
   return `${tool} ${same}`;
 }
 
@@ -102,6 +106,13 @@ export function allowedUrls(messages: readonly Message[]): Set<string> {
   return allowed;
 }
 
+/** The one argument each tool needs, which the record shows as the call's input. */
+const TOOL_ARGUMENT: Record<ToolName, string> = {
+  web_search: "query",
+  web_fetch: "url",
+  code_run: "code",
+};
+
 export type ReadToolCall =
   | { ok: true; tool: ToolName; input: string; args: Record<string, unknown> }
   | { ok: false; tool: ToolName; input: string; message: string };
@@ -127,11 +138,16 @@ export function readToolCall(call: ToolCall): ReadToolCall {
   if (tool !== call.name) {
     return { ok: false, tool, input: call.name, message: `There's no tool called ${call.name}.` };
   }
-  const value = tool === "web_search" ? args.query : args.url;
+  const needed = TOOL_ARGUMENT[tool];
+  const value = args[needed];
   const input = typeof value === "string" ? value : "";
-  if (!input) {
-    const needed = tool === "web_search" ? "query" : "url";
-    return { ok: false, tool, input: call.name, message: `${tool} needs a ${needed}.` };
+  if (!input.trim()) {
+    return {
+      ok: false,
+      tool,
+      input: call.name,
+      message: `${tool} needs ${needed === "url" ? "a url" : `a ${needed}`}.`,
+    };
   }
   return { ok: true, tool, input, args };
 }

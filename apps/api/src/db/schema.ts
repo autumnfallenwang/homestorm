@@ -86,6 +86,8 @@ export const meetings = pgTable(
     answerLength: text().notNull().default("concise"),
     // Room rule: what seats may do on the web, off / on / must, unless a seat has its own (ADR 0017).
     webAccess: text().notNull().default("off"),
+    // Room rule: whether seats may run Python through mcpgw's code_run, off / on, unless a seat has its own (ADR 0021).
+    codeAccess: text().notNull().default("on"),
     // Logical clock: +1 each time a message enters the shared record. A seat's turn sees messages whose
     // visible_seq <= the clock when the turn started (the visibility rule, ADR 0005).
     clock: integer().notNull().default(0),
@@ -95,6 +97,7 @@ export const meetings = pgTable(
   (t) => [
     check("meetings_answer_length_valid", sql`${t.answerLength} IN ('concise', 'detailed')`),
     check("meetings_web_access_valid", sql`${t.webAccess} IN ('off', 'on', 'must')`),
+    check("meetings_code_access_valid", sql`${t.codeAccess} IN ('off', 'on')`),
   ],
 );
 
@@ -119,6 +122,8 @@ export const seats = pgTable(
     contextBudget: text(),
     // What it may do on the web: off / on / must; null follows the meeting's room rule (ADR 0017).
     webAccess: text(),
+    // Whether it may run Python: off / on; null follows the meeting's room rule (ADR 0021).
+    codeAccess: text(),
     // Removed seats stay, so their earlier messages keep a name in every view.
     removedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
@@ -136,6 +141,7 @@ export const seats = pgTable(
       sql`${t.contextBudget} IN ('small', 'standard', 'large', 'full')`,
     ),
     check("seats_web_access_valid", sql`${t.webAccess} IN ('off', 'on', 'must')`),
+    check("seats_code_access_valid", sql`${t.codeAccess} IN ('off', 'on')`),
   ],
 );
 

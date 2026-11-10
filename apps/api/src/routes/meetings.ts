@@ -10,7 +10,7 @@
 //   PUT    /api/meetings/:id/brief                     set, change or clear the brief { content, keepAttachmentIds?, attachments? }
 //   GET    /api/meetings/:id/events                    live stream (SSE): snapshot, then changes (ADR 0010)
 //   GET    /api/meetings/:id/limits                    allowance per seat, from llmgw /v1/limits
-//   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort?, webAccess? }
+//   POST   /api/meetings/:id/seats                     add a seat { model, displayName?, persona?, reasoningEffort?, webAccess?, codeAccess? }
 //   PATCH  /api/meetings/:id/seats/:seatId             rename, persona, mute, effort, answer length, context, web tools
 //                                                      (a name another seat has, or had, is 409)
 //   POST   /api/meetings/:id/seats/:seatId/move        { direction: up | down }
@@ -24,6 +24,7 @@
 import {
   AddSeatInput,
   ANSWER_LENGTH_LABEL,
+  CODE_ACCESS_LABEL,
   type ContextBudget,
   CreateMeetingInput,
   type Limits,
@@ -109,17 +110,19 @@ export function meetingRoutes(deps: MeetingDeps) {
         const sample = models.find((m) => m.ownedBy === source && m.available);
         families[source] = sample ? await llm.limits(sample.id) : null;
       }
-      const webTools = tools
+      // What mcpgw offers, so the web shows only the settings that do something.
+      const listed = tools
         ? await tools.list().then(
-            () => true,
-            () => false,
+            (list) => new Set(list.map((t) => t.function.name)),
+            () => null,
           )
-        : false;
+        : null;
       return c.json({
         models,
         families,
         standardContextBudget: engine.standardContextBudget,
-        webTools,
+        webTools: !!listed?.has("web_search"),
+        codeRun: !!listed?.has("code_run"),
       });
     } catch (err) {
       log.warn({ event: "llmgw.models_failed", err }, "could not list models");
@@ -194,6 +197,12 @@ export function meetingRoutes(deps: MeetingDeps) {
     // The room rule shapes every later turn, so the transcript and the export record when it changed.
     if (meeting.answerLength !== before.answerLength) {
       await engine.addEvent(meeting.id, `You set answers to ${LENGTH_LABEL[meeting.answerLength]}`);
+    }
+    if (meeting.codeAccess !== before.codeAccess) {
+      await engine.addEvent(
+        meeting.id,
+        `You set Python to ${CODE_ACCESS_LABEL[meeting.codeAccess]}`,
+      );
     }
     if (meeting.webAccess !== before.webAccess) {
       await engine.addEvent(meeting.id, `You set web tools to ${WEB_LABEL[meeting.webAccess]}`);
@@ -321,6 +330,7 @@ export function meetingRoutes(deps: MeetingDeps) {
       answerLength: input.answerLength ?? null,
       contextBudget: input.contextBudget ?? null,
       webAccess: input.webAccess ?? null,
+      codeAccess: input.codeAccess ?? null,
     });
     engine.emit(id, { type: "seat", seat });
     await engine.addEvent(id, `You added ${seat.displayName}`);
@@ -373,6 +383,14 @@ export function meetingRoutes(deps: MeetingDeps) {
         seat.webAccess
           ? `You set ${seat.displayName}'s web tools to ${WEB_LABEL[seat.webAccess]}`
           : `You set ${seat.displayName}'s web tools back to the room rule`,
+      );
+    }
+    if (input.codeAccess !== undefined && input.codeAccess !== before.codeAccess) {
+      await engine.addEvent(
+        id,
+        seat.codeAccess
+          ? `You set ${seat.displayName}'s Python to ${CODE_ACCESS_LABEL[seat.codeAccess]}`
+          : `You set ${seat.displayName}'s Python back to the room rule`,
       );
     }
     return c.json(seat);

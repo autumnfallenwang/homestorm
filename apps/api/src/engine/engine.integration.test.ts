@@ -38,7 +38,10 @@ async function world(): Promise<World> {
     viewTokenBudget: 120_000,
     flushIntervalMs: 0,
   });
-  const meeting = await store.createMeeting("Caching");
+  // Python is on by default (ADR 0021); off here, so the web tests below see only the web tools. Its own tests turn it on.
+  const meeting = (await store.updateMeeting((await store.createMeeting("Caching")).id, {
+    codeAccess: "off",
+  })) as Meeting;
   const add = (model: string, ownedBy: Seat["ownedBy"], displayName: string) =>
     store.addSeat({
       meetingId: meeting.id,
@@ -555,6 +558,132 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
     expect(b?.status).toBe("skipped");
   });
 
+  describe("Python (ADR 0021)", () => {
+    const run = (code: string, id = "run-1") => ({
+      id,
+      name: "code_run",
+      arguments: JSON.stringify({ code }),
+    });
+    const pythonOn = (w: World) => store.updateMeeting(w.meeting.id, { codeAccess: "on" });
+    const names = (w: World, model: string, i = 0) =>
+      w.llm.callsFor(model)[i]?.tools?.map((t) => t.function.name) ?? null;
+
+    it("offers code_run alone to a seat without web tools, and records the run with its output", async () => {
+      const w = await world();
+      await pythonOn(w);
+      w.llm.on(
+        w.gpt.model,
+        { chunks: [], toolCalls: [run("print(2 + 2)")] },
+        { chunks: ["It's 4."] },
+      );
+      await w.engine.send(w.meeting.id, {
+        text: "2+2?",
+        mode: "blind",
+        targets: [w.gpt.id],
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+
+      expect(names(w, w.gpt.model)).toEqual(["code_run"]);
+      const [first, second] = w.llm.callsFor(w.gpt.model);
+      const intro = String(first?.messages[0]?.content);
+      expect(intro).toContain("You have code_run: Python 3.14");
+      expect(intro).not.toContain("You have web_search");
+      expect(intro).toContain("Up to 6 this turn. Stop once you can answer");
+      expect(String(second?.messages.at(-1)?.content)).toBe(
+        "Output:\n4\n\n(5 tool calls left this turn.)",
+      );
+      expect(w.tools.calls.map((c) => c.name)).toEqual(["code_run"]);
+      const msg = (await seatMessages(w.meeting.id)).at(-1);
+      expect(msg?.content).toBe("It's 4.");
+      expect(msg?.toolCalls).toEqual([
+        { tool: "code_run", input: "print(2 + 2)", status: "ok", output: "4" },
+      ]);
+    });
+
+    it("offers only what each seat may use, and never a tool homestorm doesn't run", async () => {
+      const w = await world();
+      await pythonOn(w);
+      w.tools.extraTools = ["future_tool"];
+      await store.updateSeat(w.gpt.id, { webAccess: "on" });
+      await store.updateSeat(w.claude.id, { webAccess: "on", codeAccess: "off" });
+      await store.updateSeat(w.ds.id, { codeAccess: "off" });
+      await w.engine.send(w.meeting.id, {
+        text: "Q",
+        mode: "blind",
+        targets: "everyone",
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+      expect(names(w, w.gpt.model)).toEqual(["web_search", "web_fetch", "code_run"]);
+      expect(names(w, w.claude.model)).toEqual(["web_search", "web_fetch"]);
+      expect(names(w, w.ds.model)).toBeNull(); // no web, no Python: no tools at all
+      expect(String(w.llm.callsFor(w.gpt.model)[0]?.messages[0]?.content)).toContain(
+        "searches, page reads and code runs together",
+      );
+    });
+
+    it("keeps must-search forcing a search first, with Python offered too", async () => {
+      const w = await world();
+      await pythonOn(w);
+      await store.updateSeat(w.gpt.id, { webAccess: "must" });
+      await w.engine.send(w.meeting.id, {
+        text: "Q",
+        mode: "blind",
+        targets: [w.gpt.id],
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+      const turn = w.llm.callsFor(w.gpt.model)[0];
+      expect(turn?.toolChoice).toEqual({ type: "function", function: { name: "web_search" } });
+      expect(names(w, w.gpt.model)).toContain("code_run");
+    });
+
+    it("records a Python error by its last line, for the seat to fix", async () => {
+      const w = await world();
+      await pythonOn(w);
+      w.tools.codeResult = {
+        text: "Python raised an error:\nTraceback ...\nZeroDivisionError: division by zero",
+        isError: false,
+        meta: {
+          status: "python_error",
+          output: "",
+          value: null,
+          error:
+            "Traceback (most recent call last):\n  File ...\nZeroDivisionError: division by zero",
+        },
+      };
+      w.llm.on(
+        w.gpt.model,
+        { chunks: [], toolCalls: [run("1/0")] },
+        { chunks: ["Can't divide by zero."] },
+      );
+      await w.engine.send(w.meeting.id, {
+        text: "Q",
+        mode: "blind",
+        targets: [w.gpt.id],
+        replyTo: null,
+      });
+      await w.engine.waitIdle(w.meeting.id);
+      expect((await seatMessages(w.meeting.id)).at(-1)?.toolCalls).toEqual([
+        {
+          tool: "code_run",
+          input: "1/0",
+          status: "failed",
+          detail: "ZeroDivisionError: division by zero",
+        },
+      ]);
+    });
+
+    it("offers no Python in a wrap-up or a poll", async () => {
+      const w = await world();
+      await pythonOn(w);
+      await w.engine.poll(w.meeting.id, { question: "Ship it?", options: [] });
+      await w.engine.waitIdle(w.meeting.id);
+      expect(w.llm.callsFor(w.gpt.model)[0]?.tools).toBeUndefined();
+    });
+  });
+
   describe("polls (ADR 0020)", () => {
     it("asks every unmuted seat at once, privately, for one line, and keeps the poll on the round", async () => {
       const w = await world();
@@ -679,13 +808,15 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
       expect(second.at(-1)).toMatchObject({ role: "tool", tool_call_id: "call-web_search" });
       expect(String(second.at(-1)?.content)).toContain("Gold is $1,234.56");
       // The seat knows its budget, and how much of it is left after each call (2026-11-09 tuning).
-      expect(turns[0]?.messages[0]?.content).toContain("up to 6 web calls this turn");
+      expect(turns[0]?.messages[0]?.content).toContain(
+        "Up to 6 this turn. Stop once you can answer",
+      );
       expect(turns[0]?.messages[0]?.content).toContain(
         "a release candidate or a preview isn't a release",
       );
-      expect(String(second.at(-1)?.content)).toMatch(/\(5 web calls left this turn\.\)$/);
+      expect(String(second.at(-1)?.content)).toMatch(/\(5 tool calls left this turn\.\)$/);
       expect(String(turns[2]?.messages.at(-1)?.content)).toMatch(
-        /\(4 web calls left this turn\.\)$/,
+        /\(4 tool calls left this turn\.\)$/,
       );
 
       const msg = await lastMessage(w);
@@ -867,7 +998,7 @@ describe.skipIf(!hasTestDb)("engine (integration)", () => {
         expect(research).toContain("web_search: q6");
         // The last step before the forced answer had been told it had one call left.
         expect(String(turns[5]?.messages.at(-1)?.content)).toMatch(
-          /\(1 web call left this turn\.\)$/,
+          /\(1 tool call left this turn\.\)$/,
         );
         // The research shown in the forced answer is the results alone, without the notes.
         expect(research).not.toContain("left this turn");

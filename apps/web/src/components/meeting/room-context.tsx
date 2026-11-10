@@ -13,6 +13,8 @@ export interface Room {
   standardContextBudget: number | null;
   /** mcpgw answers, so the web features can be offered (ADR 0014). */
   webTools: boolean;
+  /** mcpgw offers code_run (ADR 0021). */
+  codeRun: boolean;
   thinking: Record<string, number>;
   /** A round is running: new questions wait. */
   running: boolean;

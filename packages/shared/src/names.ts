@@ -1,6 +1,6 @@
 // Display names for models and sources. A seat's default name comes from its model ID.
 
-import type { AnswerLength, Seat, Source, WebAccess } from "./domain.js";
+import type { AnswerLength, CodeAccess, Seat, Source, WebAccess } from "./domain.js";
 
 const BRANDS: Record<string, string> = {
   claude: "Claude",
@@ -91,6 +91,7 @@ export const ANSWER_LENGTH_LABEL: Record<AnswerLength, string> = {
   concise: "Concise",
   detailed: "Detailed",
 };
+export const CODE_ACCESS_LABEL: Record<CodeAccess, string> = { off: "Off", on: "On" };
 export const WEB_ACCESS_LABEL: Record<WebAccess, string> = {
   off: "Off",
   on: "Can search",

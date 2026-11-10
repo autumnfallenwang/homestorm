@@ -18,6 +18,7 @@ import {
   Loader2,
   RotateCcw,
   Square,
+  SquareTerminal,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -310,7 +311,44 @@ function SeatMessage({ message, inRound }: { message: Message; inRound: boolean 
 }
 
 /** Plain text, not a link, unless the fetch really happened: a refused address may be what a page tried to send. */
+/**
+ * A code run (ADR 0021): "Ran Python", opening to the code and what it printed, so the chair can check how a number
+ * was reached. A Python error shows in amber with its last line; the seat read the whole error and could fix it.
+ */
+function CodeRun({ call }: { call: ToolActivity }) {
+  const lines = call.input.trimEnd().split("\n").length;
+  if (call.status === "running") return <>Running Python ({plural(lines, "line")})…</>;
+  const failed = call.status !== "ok";
+  return (
+    <details className="group/code">
+      <summary
+        className={cn(
+          "cursor-pointer list-none hover:text-foreground [&::-webkit-details-marker]:hidden",
+          failed && "text-warn",
+        )}
+      >
+        {failed ? "Python stopped" : "Ran Python"} ({plural(lines, "line")})
+        {failed && call.detail ? `: ${call.detail}` : ""}
+        <span className="ml-1 opacity-70 group-open/code:hidden">· show</span>
+      </summary>
+      <pre className="mt-1 max-h-64 overflow-auto rounded-md border bg-muted/60 p-2 font-mono text-[0.6875rem] whitespace-pre-wrap text-foreground">
+        {call.input.trimEnd()}
+      </pre>
+      {call.output && (
+        <pre className="mt-1 max-h-48 overflow-auto rounded-md border border-dashed p-2 font-mono text-[0.6875rem] whitespace-pre-wrap">
+          {call.output}
+        </pre>
+      )}
+    </details>
+  );
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
 function ToolCall({ call }: { call: ToolActivity }) {
+  if (call.tool === "code_run") return <CodeRun call={call} />;
   const searching = call.tool === "web_search";
   if (call.status === "running") {
     return <>{searching ? `Searching: "${call.input}"…` : `Reading: ${call.input}…`}</>;
@@ -350,11 +388,15 @@ function ToolCall({ call }: { call: ToolActivity }) {
 function ToolCalls({ calls }: { calls: ToolActivity[] }) {
   if (!calls.length) return null;
   return (
-    <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground" aria-label="Web tools used">
+    <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground" aria-label="Tools used">
       {distinctToolCalls(calls).map((call, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a turn's calls only ever grow at the end
         <li key={i} className="flex min-w-0 items-start gap-1.5">
-          <Globe className="mt-0.5 size-3 shrink-0" />
+          {call.tool === "code_run" ? (
+            <SquareTerminal className="mt-0.5 size-3 shrink-0" />
+          ) : (
+            <Globe className="mt-0.5 size-3 shrink-0" />
+          )}
           <span className="min-w-0 break-words">
             <ToolCall call={call} />
           </span>

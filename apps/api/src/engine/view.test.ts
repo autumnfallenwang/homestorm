@@ -38,6 +38,7 @@ function seat(
     answerLength: null,
     contextBudget: null,
     webAccess: null,
+    codeAccess: null,
     removedAt: null,
     createdAt: "2026-11-02T00:00:00.000Z",
     ...extra,

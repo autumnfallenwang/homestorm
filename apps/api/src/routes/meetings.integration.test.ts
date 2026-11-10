@@ -8,18 +8,27 @@ import { EventHub } from "../engine/hub.js";
 import { createStore } from "../services/store.js";
 import { hasTestDb, truncateAll } from "../test/db.js";
 import { FakeLlm } from "../test/fake-llm.js";
+import { FakeTools } from "../test/fake-tools.js";
 import { asAdmin, asNobody } from "../test/sessions.js";
 import { meetingRoutes } from "./meetings.js";
 
-function setup(resolveSession = asAdmin) {
+function setup(resolveSession = asAdmin, tools?: FakeTools) {
   const store = createStore(db);
   const llm = new FakeLlm();
   const hub = new EventHub();
-  const engine = new Engine({ store, llm, hub, viewTokenBudget: 120_000, flushIntervalMs: 0 });
+  const engine = new Engine({
+    store,
+    llm,
+    hub,
+    tools,
+    viewTokenBudget: 120_000,
+    flushIntervalMs: 0,
+  });
   const app = createApp({
     resolveSession,
     rateLimit: false,
-    mount: (a) => a.route("/api", meetingRoutes({ engine, store, llm, hub, heartbeatMs: 50 })),
+    mount: (a) =>
+      a.route("/api", meetingRoutes({ engine, store, llm, hub, tools, heartbeatMs: 50 })),
   });
   const call = async (method: string, path: string, body?: unknown) => {
     const res = await app.request(path, {
@@ -433,6 +442,60 @@ describe.skipIf(!hasTestDb)("meeting API (integration)", () => {
       .messages.map((m) => m.content)
       .join("\n");
     expect(gptView).toContain("[Claude Opus 5.5, decision]: DECISION: B");
+  });
+
+  it("has a Python room rule that seats follow unless they have their own, and records each change (ADR 0021)", async () => {
+    const { call } = setup(asAdmin, new FakeTools());
+    const models = (await call("GET", "/api/models")).body;
+    expect(models).toMatchObject({ webTools: true, codeRun: true });
+
+    const created = (await call("POST", "/api/meetings", { title: "Python" })).body;
+    const id = created.id as string;
+    expect(created.codeAccess).toBe("on");
+    const own = (
+      await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna", codeAccess: "on" })
+    ).body as Seat;
+    expect(own.codeAccess).toBe("on");
+    await call("PATCH", `/api/meetings/${id}`, { codeAccess: "off" });
+    expect((await call("PATCH", `/api/meetings/${id}`, { codeAccess: "maybe" })).status).toBe(400);
+
+    let md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("- Python: Off");
+    expect(md).toContain("| GPT-6 Luna | `gpt-6-luna` | GPT · ChatGPT | Python: On |");
+
+    await call("PATCH", `/api/meetings/${id}/seats/${own.id}`, { codeAccess: null });
+    const state = (await call("GET", `/api/meetings/${id}`)).body as MeetingState;
+    expect(state.messages.filter((m) => m.authorKind === "event").map((m) => m.content)).toEqual([
+      "You added GPT-6 Luna",
+      "You set Python to Off",
+      "You set GPT-6 Luna's Python back to the room rule",
+    ]);
+    md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("| GPT-6 Luna | `gpt-6-luna` | GPT · ChatGPT |  |");
+  });
+
+  it("exports the Python a seat ran and what it printed", async () => {
+    const { call, engine, llm } = setup(asAdmin, new FakeTools());
+    llm.on(
+      "gpt-6-luna",
+      {
+        chunks: [],
+        toolCalls: [{ id: "r1", name: "code_run", arguments: '{"code":"print(2 + 2)"}' }],
+      },
+      { chunks: ["It's 4."] },
+    );
+    const id = (await call("POST", "/api/meetings", { title: "Sums" })).body.id as string;
+    const seat = (await call("POST", `/api/meetings/${id}/seats`, { model: "gpt-6-luna" }))
+      .body as Seat;
+    await call("POST", `/api/meetings/${id}/actions`, {
+      text: "2+2?",
+      mode: "blind",
+      targets: [seat.id],
+    });
+    await engine.waitIdle(id);
+    const md = (await call("GET", `/api/meetings/${id}/export.md`)).text;
+    expect(md).toContain("_Ran Python_");
+    expect(md).toContain("_Ran Python:_\n\n```python\nprint(2 + 2)\n```\n\n```text\n4\n```");
   });
 
   it("takes thinking effort Off when adding a seat and when changing one", async () => {

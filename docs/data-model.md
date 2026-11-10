@@ -9,8 +9,8 @@ The tables behind a meeting, and how the visibility rule is stored. The schema i
 
 | Table | One row per | Key fields |
 |---|---|---|
-| `meetings` | meeting | `title`; room rules `answer_length` (concise / detailed) and `web_access` (off / on / must); `clock` |
-| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `web_access` (off / on / must; null: follow the room rule), `removed_at` |
+| `meetings` | meeting | `title`; room rules `answer_length` (concise / detailed), `web_access` (off / on / must) and `code_access` (off / on, ADR 0021); `clock` |
+| `seats` | seat in a meeting | `model` (exact llmgw ID), `owned_by`, `display_name`, `persona`, `position`, `muted`, `reasoning_effort`, `answer_length` (null: follow the room rule), `context_budget` (small / standard / large / full; null is standard), `web_access` (off / on / must; null: follow the room rule), `code_access` (off / on; null: follow the room rule), `removed_at` |
 | `rounds` | time the chair gives the floor | `number`, `mode` (blind / in_turn / single / wrap_up / poll), `seat_ids` in answering order, `prompt_message_id`, `reply_to_id`, `wrap_kind`, `poll` (question and options, ADR 0020), `status` |
 | `messages` | transcript entry | `author_kind` (chair / seat / event / brief / sources), `seat_id`, `round_id`, `content`, `status`, `visible_seq`, `cutoff_seq`, `tool_calls` (what a seat searched and read), tracing fields |
 | `attachments` | image or text file on a chair message or a brief version | `message_id`, `position`, `kind` (image / text), `name`, `mime`, `size_bytes`, `width`, `height`, `text_chars`, `data` (bytea) ([ADR 0016](adr/0016-attachments-images-and-text-files.md)) |

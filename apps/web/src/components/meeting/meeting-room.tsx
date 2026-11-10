@@ -89,6 +89,7 @@ export function MeetingRoom({ id }: { id: string }) {
       models: new Map((modelList?.models ?? []).map((m) => [m.id, m])),
       standardContextBudget: modelList?.standardContextBudget ?? null,
       webTools: modelList?.webTools ?? false,
+      codeRun: modelList?.codeRun ?? false,
       thinking: live.thinking,
       running,
       seatById,

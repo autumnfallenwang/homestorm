@@ -36,3 +36,19 @@ describe("toolSummary", () => {
     ).toBe(`Searched: "burn-in 16TB" · Read: ${page}`);
   });
 });
+
+describe("toolSummary with Python", () => {
+  it("counts the code runs that worked", () => {
+    const run = (status: "ok" | "failed") => ({ tool: "code_run" as const, input: "x", status });
+    expect(toolSummary([run("ok")])).toBe("Ran Python");
+    expect(toolSummary([run("ok"), { ...run("ok"), input: "y" }, run("failed")])).toBe(
+      "Ran Python twice",
+    );
+    expect(
+      toolSummary([
+        { tool: "web_search", input: "q", status: "ok" },
+        ...["a", "b", "c"].map((input) => ({ ...run("ok"), input })),
+      ]),
+    ).toBe('Searched: "q" · Ran Python 3 times');
+  });
+});

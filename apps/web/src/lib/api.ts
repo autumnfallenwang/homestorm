@@ -65,6 +65,8 @@ export interface ModelsResponse {
   standardContextBudget: number;
   /** mcpgw answers, so the web features can be offered (ADR 0014). */
   webTools: boolean;
+  /** mcpgw offers code_run, so seats can be given Python (ADR 0021). */
+  codeRun: boolean;
 }
 
 export const api = {

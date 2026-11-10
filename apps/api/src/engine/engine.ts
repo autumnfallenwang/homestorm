@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import {
   type AttachmentInput,
   type AttachmentMeta,
+  type CodeAccess,
   canTakeFloor,
   contextBudgetTokens,
   type Meeting,
@@ -24,9 +25,11 @@ import {
   type Seat,
   type SendAction,
   seatAnswerLength,
+  seatCodeAccess,
   seatWebAccess,
   stripSpeakerTag,
   type ToolActivity,
+  WEB_TOOL_NAMES,
   type WebAccess,
   type WrapKind,
 } from "@homestorm/shared";
@@ -708,16 +711,26 @@ export class Engine {
   }
 
   /** What the seat is told it's doing now, derived from its round (so a retry gets the same note). */
-  /** The tools to offer this seat this turn, or null. mcpgw being down isn't a reason to fail the turn. */
+  /**
+   * The tools to offer this seat this turn, or null: the web tools by its web setting, code_run by its Python setting
+   * (ADR 0021), and only those mcpgw lists. mcpgw lists every tool it has, so offering its whole list would hand seats
+   * tools homestorm doesn't run. mcpgw being down isn't a reason to fail the turn.
+   */
   private async toolsFor(
     seat: Seat,
     web: WebAccess,
+    code: CodeAccess,
     floor: Floor,
   ): Promise<ToolDefinition[] | null> {
-    if (!this.tools || web === "off" || floor.kind === "wrap_up" || floor.kind === "poll")
-      return null;
+    if (!this.tools || floor.kind === "wrap_up" || floor.kind === "poll") return null;
+    const wanted = new Set<string>([
+      ...(web === "off" ? [] : WEB_TOOL_NAMES),
+      ...(code === "on" ? ["code_run"] : []),
+    ]);
+    if (!wanted.size) return null;
     try {
-      return await this.tools.list();
+      const offered = (await this.tools.list()).filter((t) => wanted.has(t.function.name));
+      return offered.length ? offered : null;
     } catch (err) {
       log.warn({ event: "tools.unavailable", seat_id: seat.id, err }, "answering without tools");
       return null;
@@ -760,6 +773,7 @@ export class Engine {
         return { text: out.text, activity: { tool, input, status: "ok", urls } };
       }
       const title = typeof out.meta?.title === "string" ? out.meta.title : undefined;
+      if (tool === "code_run") return { text: out.text, activity: codeActivity(input, out.meta) };
       return {
         text: out.text,
         activity: { tool, input, status: "ok", ...(title ? { title } : {}) },
@@ -767,7 +781,10 @@ export class Engine {
     } catch (err) {
       if (opts.signal.aborted) throw err;
       log.warn({ event: "tool.call_failed", tool, err }, "tool call failed");
-      const text = "The web tools aren't answering right now. Answer without them, and say so.";
+      const text =
+        tool === "code_run"
+          ? "Python isn't answering right now. Answer without running code, and say so."
+          : "The web tools aren't answering right now. Answer without them, and say so.";
       return { text, activity: { tool, input, status: "failed", detail: "mcpgw didn't answer" } };
     }
   }
@@ -856,9 +873,11 @@ export class Engine {
     );
     // The seat's own web setting, or the room rule (ADR 0017), as of when the turn starts.
     const web = seatWebAccess(seat, state.meeting);
-    const tools = await this.toolsFor(seat, web, floor);
+    const tools = await this.toolsFor(seat, web, seatCodeAccess(seat, state.meeting), floor);
+    const offered = new Set((tools ?? []).map((t) => t.function.name));
     const view = buildView({
-      webTools: !!tools,
+      webTools: offered.has("web_search"),
+      codeRun: offered.has("code_run"),
       meeting: state.meeting,
       seats: state.seats,
       messages: state.messages,
@@ -962,7 +981,10 @@ export class Engine {
           ...(offer
             ? {
                 tools: tools ?? [],
-                toolChoice: step === 0 && web === "must" ? FORCED_SEARCH : ("auto" as const),
+                toolChoice:
+                  step === 0 && web === "must" && offered.has("web_search")
+                    ? FORCED_SEARCH
+                    : ("auto" as const),
               }
             : {}),
         })) {
@@ -1159,4 +1181,31 @@ export class Engine {
     const meeting = await this.store.getMeeting(meetingId);
     if (meeting) this.emit(meetingId, { type: "meeting", meeting });
   }
+}
+
+/** How much of a code run's output the record keeps; the seat itself got mcpgw's 16,000 characters. */
+const RECORDED_OUTPUT_CHARS = 2_000;
+
+/**
+ * A code_run call as the record shows it (ADR 0021): what it printed and the value of its last line, or Python's own
+ * error, which the seat read and can fix.
+ */
+export function codeActivity(code: string, meta: Record<string, unknown> | null): ToolActivity {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const printed = str(meta?.output).trimEnd();
+  const value = meta?.value == null ? "" : String(meta.value);
+  const output = [printed, value && `→ ${value}`].filter(Boolean).join("\n");
+  const kept =
+    output.length > RECORDED_OUTPUT_CHARS ? `${output.slice(0, RECORDED_OUTPUT_CHARS)}…` : output;
+  if (meta?.status === "python_error") {
+    const lines = str(meta.error).trim().split("\n").filter(Boolean);
+    return {
+      tool: "code_run",
+      input: code,
+      status: "failed",
+      detail: (lines.at(-1) ?? "Python raised an error").slice(0, 200),
+      ...(kept ? { output: kept } : {}),
+    };
+  }
+  return { tool: "code_run", input: code, status: "ok", ...(kept ? { output: kept } : {}) };
 }

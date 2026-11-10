@@ -2,6 +2,7 @@
 
 import {
   type AnswerLength,
+  type CodeAccess,
   type ContextBudget,
   type ModelInfo,
   maxOutputTokens,
@@ -40,6 +41,7 @@ import { api, type ModelsResponse } from "@/lib/api";
 import { allowanceLine, compareModels } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AnswerLengthSelect } from "./answer-length-select";
+import { CodeAccessSelect } from "./code-access-select";
 import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { SeatAvatar } from "./source";
@@ -67,6 +69,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
   const [web, setWeb] = useState<WebAccess | null>(null);
+  const [code, setCode] = useState<CodeAccess | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -100,6 +103,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
     setLength(null);
     setBudget(null);
     setWeb(null);
+    setCode(null);
     setQuery("");
   }
 
@@ -115,6 +119,7 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
         answerLength: length,
         contextBudget: budget,
         webAccess: web,
+        codeAccess: code,
       }),
     );
     setBusy(false);
@@ -312,6 +317,13 @@ export function AddSeatDialog({ compact = false }: { compact?: boolean }) {
             />
             {(data?.webTools || state.meeting.webAccess !== "off") && (
               <WebAccessSelect value={web} onChange={setWeb} roomRule={state.meeting.webAccess} />
+            )}
+            {data?.codeRun && (
+              <CodeAccessSelect
+                value={code}
+                onChange={setCode}
+                roomRule={state.meeting.codeAccess}
+              />
             )}
           </div>
         )}

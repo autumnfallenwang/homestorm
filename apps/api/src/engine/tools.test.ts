@@ -2,6 +2,7 @@ import type { Message } from "@homestorm/shared";
 import { describe, expect, it } from "vitest";
 import {
   allowedUrls,
+  callKey,
   callsLeftNote,
   canonicalUrl,
   readToolCall,
@@ -101,12 +102,28 @@ describe("readToolCall", () => {
     });
   });
 
+  it("reads a code run, keeping its code as the input", () => {
+    expect(
+      readToolCall({ id: "1", name: "code_run", arguments: '{"code":"print(1)"}' }),
+    ).toMatchObject({
+      ok: true,
+      tool: "code_run",
+      input: "print(1)",
+    });
+  });
+
+  it("compares code exactly, unlike a search", () => {
+    expect(callKey("code_run", "X = 1")).not.toBe(callKey("code_run", "x = 1"));
+    expect(callKey("web_search", "Gold Price")).toBe(callKey("web_search", "gold price"));
+  });
+
   it.each([
     ["web_search", "{not json", /valid JSON/],
     ["web_search", "[1,2]", /valid JSON/],
     ["web_search", "{}", /needs a query/],
     ["web_fetch", '{"url":5}', /needs a url/],
     ["web_fetch", "", /needs a url/],
+    ["code_run", '{"code":"   "}', /needs a code/],
     ["delete_everything", "{}", /no tool called delete_everything/],
   ])("%s with %s", (name, args, message) => {
     const read = readToolCall({ id: "1", name, arguments: args });
@@ -141,8 +158,8 @@ describe("what goes into the record", () => {
 
 describe("callsLeftNote", () => {
   it("says how many calls are left, and to answer when none are", () => {
-    expect(callsLeftNote(5)).toBe("(5 web calls left this turn.)");
-    expect(callsLeftNote(1)).toBe("(1 web call left this turn.)");
-    expect(callsLeftNote(0)).toBe("(No web calls left this turn: answer now from what you have.)");
+    expect(callsLeftNote(5)).toBe("(5 tool calls left this turn.)");
+    expect(callsLeftNote(1)).toBe("(1 tool call left this turn.)");
+    expect(callsLeftNote(0)).toBe("(No tool calls left this turn: answer now from what you have.)");
   });
 });

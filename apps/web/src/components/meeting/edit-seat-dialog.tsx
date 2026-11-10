@@ -2,6 +2,7 @@
 
 import {
   type AnswerLength,
+  type CodeAccess,
   type ContextBudget,
   maxOutputTokens,
   type ReasoningEffort,
@@ -33,6 +34,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { AnswerLengthSelect } from "./answer-length-select";
+import { CodeAccessSelect } from "./code-access-select";
 import { ContextBudgetSelect } from "./context-budget-select";
 import { useRoom } from "./room-context";
 import { WebAccessSelect } from "./web-access-select";
@@ -42,13 +44,14 @@ import { WebAccessSelect } from "./web-access-select";
  * be a different seat.
  */
 export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: () => void }) {
-  const { id, state, act, models, standardContextBudget, webTools } = useRoom();
+  const { id, state, act, models, standardContextBudget, webTools, codeRun } = useRoom();
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
   const [length, setLength] = useState<AnswerLength | null>(null);
   const [budget, setBudget] = useState<ContextBudget | null>(null);
   const [web, setWeb] = useState<WebAccess | null>(null);
+  const [code, setCode] = useState<CodeAccess | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
       setLength(seat.answerLength);
       setBudget(seat.contextBudget);
       setWeb(seat.webAccess);
+      setCode(seat.codeAccess);
     }
   }, [seat]);
 
@@ -76,6 +80,7 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
         answerLength: length,
         contextBudget: budget,
         webAccess: web,
+        codeAccess: code,
       }),
     );
     setBusy(false);
@@ -150,6 +155,9 @@ export function EditSeatDialog({ seat, onClose }: { seat: Seat | null; onClose: 
           />
           {(webTools || (web ?? state.meeting.webAccess) !== "off") && (
             <WebAccessSelect value={web} onChange={setWeb} roomRule={state.meeting.webAccess} />
+          )}
+          {codeRun && (
+            <CodeAccessSelect value={code} onChange={setCode} roomRule={state.meeting.codeAccess} />
           )}
         </div>
         <DialogFooter>

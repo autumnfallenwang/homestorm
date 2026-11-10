@@ -1,6 +1,14 @@
 "use client";
 
-import { canTakeFloor, type Seat, WEB_ACCESS, type WebAccess } from "@homestorm/shared";
+import {
+  CODE_ACCESS,
+  CODE_ACCESS_LABEL,
+  type CodeAccess,
+  canTakeFloor,
+  type Seat,
+  WEB_ACCESS,
+  type WebAccess,
+} from "@homestorm/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -148,6 +156,7 @@ function ownSettings(seat: Seat): string[] {
       ? `${BUDGET_LABEL[seat.contextBudget]} context`
       : "",
     seat.webAccess ? WEB_CARD_LABEL[seat.webAccess] : "",
+    seat.codeAccess ? (seat.codeAccess === "on" ? "Python" : "no Python") : "",
   ].filter(Boolean);
 }
 
@@ -311,7 +320,7 @@ function SeatCard({ seat, first, last }: { seat: Seat; first: boolean; last: boo
 }
 
 function RoomRules() {
-  const { id, state, act, webTools } = useRoom();
+  const { id, state, act, webTools, codeRun } = useRoom();
   const m = state.meeting;
   return (
     <section className="border-t px-4 py-3" aria-label="Room rules">
@@ -351,6 +360,29 @@ function RoomRules() {
                 {WEB_ACCESS.map((w) => (
                   <SelectItem key={w} value={w}>
                     {WEB_LABEL[w]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        )}
+        {/* ADR 0021: on by default; shown only when mcpgw offers code_run. */}
+        {codeRun && (
+          <label className="flex items-center justify-between gap-2">
+            <span className="whitespace-nowrap text-muted-foreground">Python</span>
+            <Select
+              value={m.codeAccess}
+              onValueChange={(v) =>
+                act(() => api.updateMeeting(id, { codeAccess: v as CodeAccess }))
+              }
+            >
+              <SelectTrigger size="sm" className="h-7 w-40 text-xs" aria-label="Python">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CODE_ACCESS.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {CODE_ACCESS_LABEL[c]}
                   </SelectItem>
                 ))}
               </SelectContent>

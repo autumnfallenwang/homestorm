@@ -81,6 +81,8 @@ export interface ViewInput {
   today?: string;
   /** This seat is being offered web tools this turn (ADR 0014). */
   webTools?: boolean;
+  /** This seat is offered code_run this turn (ADR 0021). */
+  codeRun?: boolean;
 }
 
 export interface View {
@@ -181,6 +183,7 @@ export function buildView(input: ViewInput): View {
   const intro = renderIntro({
     today: input.today ?? new Date().toISOString().slice(0, 10),
     webTools: input.webTools ?? false,
+    codeRun: input.codeRun ?? false,
     meetingTitle: input.meeting.title,
     self: { displayName: seat.displayName, model: seat.model, persona: seat.persona },
     roster,

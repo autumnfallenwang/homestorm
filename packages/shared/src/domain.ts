@@ -71,6 +71,13 @@ export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
 export const WEB_ACCESS = ["off", "on", "must"] as const;
 export type WebAccess = (typeof WEB_ACCESS)[number];
 
+/**
+ * Whether a seat may run Python through mcpgw's `code_run` (ADR 0021): sums, totals and comparisons done exactly, not in
+ * its head. A room rule like web tools, on by default, which a seat follows unless it has its own.
+ */
+export const CODE_ACCESS = ["off", "on"] as const;
+export type CodeAccess = (typeof CODE_ACCESS)[number];
+
 export const WRAP_KINDS = ["minutes", "decision", "open_questions"] as const;
 export type WrapKind = (typeof WRAP_KINDS)[number];
 
@@ -103,13 +110,15 @@ export interface Usage {
   estimated: boolean;
 }
 
-export const TOOL_NAMES = ["web_search", "web_fetch"] as const;
+/** mcpgw's tools a seat may be offered: the web tools (ADR 0014) and Python (ADR 0021). */
+export const TOOL_NAMES = ["web_search", "web_fetch", "code_run"] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
+export const WEB_TOOL_NAMES: readonly ToolName[] = ["web_search", "web_fetch"];
 
 /** One tool call a seat made during its turn. It enters the record with the answer, so sources stay visible (ADR 0014). */
 export interface ToolActivity {
   tool: ToolName;
-  /** The query, or the URL. */
+  /** The query, the URL, or the Python code. */
   input: string;
   /** `refused`: homestorm's own URL rule stopped it (ADR 0014). `failed`: mcpgw or the site did. */
   status: "running" | "ok" | "failed" | "refused";
@@ -117,8 +126,10 @@ export interface ToolActivity {
   urls?: string[];
   /** web_fetch: the page's title. */
   title?: string;
-  /** Why it failed or was refused. */
+  /** Why it failed or was refused; for code_run, Python's error. */
   detail?: string;
+  /** code_run: what the code printed and the value of its last line, cut short for the record. */
+  output?: string;
 }
 
 /**
@@ -136,14 +147,16 @@ export function distinctToolCalls(calls: readonly ToolActivity[]): ToolActivity[
   });
 }
 
-/** "Searched: "gold price" · Read: https://…", or null if nothing worked. */
+/** "Searched: "gold price" · Read: https://… · Ran Python twice", or null if nothing worked. */
 export function toolSummary(calls: readonly ToolActivity[]): string | null {
   const worked = distinctToolCalls(calls).filter((c) => c.status === "ok");
   const searched = worked.filter((c) => c.tool === "web_search").map((c) => `"${c.input}"`);
   const read = worked.filter((c) => c.tool === "web_fetch").map((c) => c.input);
+  const runs = worked.filter((c) => c.tool === "code_run").length;
   const parts = [
     searched.length ? `Searched: ${searched.join(", ")}` : "",
     read.length ? `Read: ${read.join(", ")}` : "",
+    runs ? `Ran Python${runs === 1 ? "" : runs === 2 ? " twice" : ` ${runs} times`}` : "",
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
@@ -154,6 +167,8 @@ export interface Meeting {
   answerLength: AnswerLength;
   /** Room rule: what seats may do on the web, unless a seat has its own (ADR 0017). */
   webAccess: WebAccess;
+  /** Room rule: whether seats may run Python, unless a seat has its own (ADR 0021). */
+  codeAccess: CodeAccess;
   /** Logical clock: bumped each time a message enters the shared record. See docs/data-model.md. */
   clock: number;
   createdAt: string;
@@ -178,6 +193,8 @@ export interface Seat {
   contextBudget: ContextBudget | null;
   /** What it may do on the web; null follows the room rule (ADR 0017). */
   webAccess: WebAccess | null;
+  /** Whether it may run Python; null follows the room rule (ADR 0021). */
+  codeAccess: CodeAccess | null;
   /** Removed seats stay so their old messages keep a name. */
   removedAt: string | null;
   createdAt: string;
@@ -288,6 +305,7 @@ export const UpdateMeetingInput = z
     title: z.string().trim().min(1).max(200),
     answerLength: z.enum(ANSWER_LENGTHS),
     webAccess: z.enum(WEB_ACCESS),
+    codeAccess: z.enum(CODE_ACCESS),
   })
   .partial();
 export type UpdateMeetingInput = z.infer<typeof UpdateMeetingInput>;
@@ -330,6 +348,8 @@ export const AddSeatInput = z.object({
   contextBudget: z.enum(CONTEXT_BUDGETS).nullable().optional(),
   /** Omitted or null: follow the room rule. */
   webAccess: z.enum(WEB_ACCESS).nullable().optional(),
+  /** Omitted or null: follow the room rule. */
+  codeAccess: z.enum(CODE_ACCESS).nullable().optional(),
 });
 export type AddSeatInput = z.infer<typeof AddSeatInput>;
 
@@ -345,6 +365,8 @@ export const UpdateSeatInput = z
     contextBudget: z.enum(CONTEXT_BUDGETS).nullable(),
     /** null: back to the room rule. */
     webAccess: z.enum(WEB_ACCESS).nullable(),
+    /** null: back to the room rule. */
+    codeAccess: z.enum(CODE_ACCESS).nullable(),
   })
   .partial();
 export type UpdateSeatInput = z.infer<typeof UpdateSeatInput>;
@@ -366,6 +388,14 @@ export function seatWebAccess(
   meeting: Pick<Meeting, "webAccess">,
 ): WebAccess {
   return seat.webAccess ?? meeting.webAccess;
+}
+
+/** Whether a seat may run Python (ADR 0021): its own setting, or else the room rule. */
+export function seatCodeAccess(
+  seat: Pick<Seat, "codeAccess">,
+  meeting: Pick<Meeting, "codeAccess">,
+): CodeAccess {
+  return seat.codeAccess ?? meeting.codeAccess;
 }
 
 export const MoveSeatInput = z.object({ direction: z.enum(["up", "down"]) });

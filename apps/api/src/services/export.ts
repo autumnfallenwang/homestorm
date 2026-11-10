@@ -4,6 +4,7 @@ import {
   ANSWER_LENGTH_LABEL,
   type AttachmentMeta,
   briefAt,
+  CODE_ACCESS_LABEL,
   type MeetingState,
   type Message,
   type Poll,
@@ -62,6 +63,7 @@ export function exportMarkdown(
     "",
     `- Answer length: ${ANSWER_LENGTH_LABEL[meeting.answerLength]}`,
     `- Web tools: ${WEB_ACCESS_LABEL[meeting.webAccess]}`,
+    `- Python: ${CODE_ACCESS_LABEL[meeting.codeAccess]}`,
     "",
     "## Seats",
     "",
@@ -76,6 +78,7 @@ export function exportMarkdown(
         s.answerLength ? `answers: ${ANSWER_LENGTH_LABEL[s.answerLength]}` : "",
         s.contextBudget && s.contextBudget !== "standard" ? `context: ${s.contextBudget}` : "",
         s.webAccess ? `web tools: ${WEB_ACCESS_LABEL[s.webAccess]}` : "",
+        s.codeAccess ? `Python: ${CODE_ACCESS_LABEL[s.codeAccess]}` : "",
         s.persona ? `persona: ${oneLine(s.persona)}` : "",
       ]
         .filter(Boolean)
@@ -96,6 +99,20 @@ export function exportMarkdown(
     if (brief) out.push(brief, "");
     if (currentBrief) out.push(...files(currentBrief));
   }
+  /** The Python a seat ran and what came back (ADR 0021), so the record shows how a number was reached. */
+  const codeRuns = (m: Message): string[] =>
+    m.toolCalls
+      .filter((c) => c.tool === "code_run" && c.status !== "running")
+      .flatMap((c) => [
+        `_Ran Python${c.status === "ok" ? "" : ` (${c.detail ?? "failed"})`}:_`,
+        "",
+        "```python",
+        c.input.trimEnd(),
+        "```",
+        ...(c.output ? ["", "```text", c.output, "```"] : []),
+        "",
+      ]);
+
   /** A poll's answers as a table, with the tally when it had options (ADR 0020). */
   const pollTable = (r: Round, poll: Poll): string[] => {
     const answers = messages
@@ -209,6 +226,7 @@ export function exportMarkdown(
     if (m.content) out.push(m.content, "");
     const sources = toolSummary(m.toolCalls);
     if (sources) out.push(`_${sources}_`, "");
+    out.push(...codeRuns(m));
     if (m.status === "stopped" || m.stoppedEarly) out.push("_(stopped early)_", "");
     if (m.status === "error") out.push(`_(problem: ${m.error?.message ?? "error"})_`, "");
   }

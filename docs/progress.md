@@ -4,6 +4,21 @@ A dated log of what was done and decided, newest first. The plan and milestone s
 
 ---
 
+## 2026-11-10
+
+- **Python for seats** ([ADR 0021](adr/0021-python-through-mcpgw-code-run.md)), using mcpgw's new `code_run`.
+  - **A bug first:** homestorm offered seats with web tools mcpgw's whole tool list, which gained `code_run` on
+    2026-11-10, but couldn't run it and didn't mention it. Now a seat is offered exactly what it may use, from what
+    mcpgw lists: a tool mcpgw adds later isn't offered until homestorm handles it. No seat had called it yet.
+  - **The setting:** Python, On or Off, in Room rules and per seat, like web tools; On by default, existing meetings
+    included (migration 0010). Shown only when mcpgw lists `code_run`. Changes add event lines.
+  - **The prompt:** a Python section, and the 6 calls a turn shared with searches and page reads ("(4 tool calls left
+    this turn.)").
+  - **The record:** "Ran Python (3 lines)" under an answer, opening to the code and its output; a Python error in amber
+    with its last line. Other seats see "Ran Python twice". The export has each run's code and output.
+  - **Checked:** 11 new tests (offered per seat, never an unknown tool, must-search still first, the run and its
+    output recorded, a Python error, none in a poll, the room rule and its events, the export).
+
 ## 2026-11-09
 
 - **Thinking effort Off** ([ADR 0012](adr/0012-long-meetings-answer-length-effort.md)), on the user's go after the

@@ -40,9 +40,18 @@ export class FakeTools implements ToolClient {
     },
   };
 
+  /** What code_run returns: by default the code printed 4. */
+  codeResult: ToolOutcome = {
+    text: "Output:\n4",
+    isError: false,
+    meta: { status: "ok", output: "4\n", value: null, error: null },
+  };
+  /** Tools mcpgw also lists that homestorm doesn't run, as a newer mcpgw might. */
+  extraTools: string[] = [];
+
   async list(): Promise<ToolDefinition[]> {
     if (this.down) throw new Error("mcpgw is down");
-    return [def("web_search"), def("web_fetch")];
+    return [def("web_search"), def("web_fetch"), def("code_run"), ...this.extraTools.map(def)];
   }
 
   async call(
@@ -58,6 +67,7 @@ export class FakeTools implements ToolClient {
       });
     }
     if (name === "web_search") return this.searchResult;
+    if (name === "code_run") return this.codeResult;
     const url = String(args.url);
     return (
       this.pages.get(url) ?? {
